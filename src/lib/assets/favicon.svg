@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Subtle border gradient -->
+  <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#18181b"/>
+    <stop offset="100%" stop-color="#09090b"/>
+  </linearGradient>
+  <linearGradient id="brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#ffffff"/>
+    <stop offset="100%" stop-color="#a1a1aa"/>
+  </linearGradient>
+  
+  <!-- Background container -->
+  <rect width="32" height="32" rx="8" fill="url(#bg-grad)"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1"/>
+  
+  <!-- Stylized R monogram -->
+  <!-- Outer loop & stem -->
+  <path d="M9.5 8H16.5C19.5376 8 22 10.4624 22 13.5C22 16.5376 19.5376 19 16.5 19H12.5V24H9.5V8ZM12.5 11V16H16.5C17.8807 16 19 14.8807 19 13.5C19 12.1193 17.8807 11 16.5 11H12.5Z" fill="url(#brand-grad)"/>
+  <!-- Diagonal leg -->
+  <path d="M15 18L21 24H24.5L17.8 17.3L15 18Z" fill="url(#brand-grad)"/>
+  
+  <!-- Accent dot representing the '.dev' portion of Rhnx.dev -->
+  <circle cx="24" cy="22.5" r="1.5" fill="#ffffff"/>
+</svg>
