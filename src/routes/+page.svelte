@@ -3,9 +3,10 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { Check } from '@lucide/svelte';
-	import { getPastes, savePaste } from '$lib/pasteStore';
+	import { getPastes, savePaste, getPasteById, updatePaste } from '$lib/pasteStore';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/authStore.svelte';
+	import { page } from '$app/stores';
 
 	// ─── State ───────────────────────────────────────────────────────────────
 	let recentPastes = $state<any[]>([]);
@@ -13,26 +14,37 @@
 	let toastMsg = $state('');
 	let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
+	async function loadRecentPastes() {
+		try {
+			const pastes = await getPastes();
+			recentPastes = pastes
+				.filter((p) => {
+					// Public pastes are visible to everyone
+					if (p.visibility === 'public') return true;
+					// Private pastes are visible only to their logged-in author
+					if (p.visibility === 'private') {
+						return auth.currentUser && p.author.toLowerCase() === auth.currentUser.username.toLowerCase();
+					}
+					// Unlisted pastes are hidden from recent pastes lists (accessible via link sharing only)
+					return false;
+				})
+				.map((p) => ({
+					id: p.id,
+					title: p.title,
+					lang: p.lang,
+					lines: p.content ? p.content.split('\n').length : 0,
+					date: p.date,
+					private: p.visibility === 'private'
+				}));
+		} catch (e) {
+			console.error('Failed to load recent pastes', e);
+		}
+	}
+
 	$effect(() => {
-		recentPastes = getPastes()
-			.filter((p) => {
-				// Public pastes are visible to everyone
-				if (p.visibility === 'public') return true;
-				// Private pastes are visible only to their logged-in author
-				if (p.visibility === 'private') {
-					return auth.currentUser && p.author.toLowerCase() === auth.currentUser.username.toLowerCase();
-				}
-				// Unlisted pastes are hidden from recent pastes lists (accessible via link sharing only)
-				return false;
-			})
-			.map((p) => ({
-				id: p.id,
-				title: p.title,
-				lang: p.lang,
-				lines: p.content ? p.content.split('\n').length : 0,
-				date: p.date,
-				private: p.visibility === 'private'
-			}));
+		// Re-run when auth is checked or user status updates
+		const _user = auth.currentUser;
+		loadRecentPastes();
 	});
 
 	// ─── Helpers ─────────────────────────────────────────────────────────────
@@ -43,41 +55,55 @@
 		toastTimeout = setTimeout(() => (showToast = false), 3000);
 	}
 
-	function handleCreatePaste(data: {
+	let editId = $derived($page.url.searchParams.get('edit'));
+	let editPaste = $state<any>(null);
+
+	async function loadEditPaste() {
+		if (editId) {
+			try {
+				const p = await getPasteById(editId);
+				if (p && auth.currentUser && p.author.toLowerCase() === auth.currentUser.username.toLowerCase()) {
+					editPaste = p;
+				} else {
+					editPaste = null;
+				}
+			} catch (e) {
+				console.error(e);
+				editPaste = null;
+			}
+		} else {
+			editPaste = null;
+		}
+	}
+
+	$effect(() => {
+		loadEditPaste();
+	});
+
+	async function handleCreatePaste(data: {
 		title: string;
 		content: string;
 		lang: string;
 		expiry: string;
 		visibility: 'public' | 'unlisted' | 'private';
 	}) {
-		const newId = Math.random().toString(36).substring(2, 8);
-		const formattedDate = new Date().toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		}) + ' · ' + new Date().toLocaleTimeString('en-US', {
-			hour: '2-digit',
-			minute: '2-digit',
-			hour12: false
-		});
-
-		const newPaste = {
-			id: newId,
-			title: data.title,
-			content: data.content,
-			lang: data.lang,
-			expiry: data.expiry,
-			visibility: data.visibility,
-			author: auth.currentUser ? auth.currentUser.username : 'Anonymous',
-			date: formattedDate,
-			views: 0
-		};
-
-		savePaste(newPaste);
-		toast('Paste created!');
-		setTimeout(() => {
-			goto(`/${newId}`);
-		}, 500);
+		try {
+			if (editId) {
+				await updatePaste(editId, data);
+				toast('Paste updated!');
+				setTimeout(() => {
+					goto(`/${editId}`);
+				}, 500);
+			} else {
+				const newPaste = await savePaste(data);
+				toast('Paste created!');
+				setTimeout(() => {
+					goto(`/${newPaste.id}`);
+				}, 500);
+			}
+		} catch (err: any) {
+			toast(err.message || 'Failed to save paste.');
+		}
 	}
 
 	function handleSelectRecentPaste(paste: { id: string }) {
@@ -86,16 +112,16 @@
 </script>
 
 <svelte:head>
-	<title>Pastey — Minimal Code Sharing · reihan.dev</title>
+	<title>Pastey — Minimal Code Sharing · rhnx.my.id</title>
 	<meta
 		name="description"
 		content="Pastey is a minimal, elegant code paste tool. Share code snippets instantly with syntax highlighting and expiry options."
 	/>
-	<link rel="canonical" href="https://reihan.dev/" />
+	<link rel="canonical" href="https://rhnx.my.id/" />
 	<meta name="robots" content="index, follow" />
 
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://reihan.dev/" />
+	<meta property="og:url" content="https://rhnx.my.id/" />
 	<meta property="og:title" content="Pastey — Minimal Code Sharing" />
 	<meta
 		property="og:description"
@@ -103,7 +129,7 @@
 	/>
 
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:url" content="https://reihan.dev/" />
+	<meta name="twitter:url" content="https://rhnx.my.id/" />
 	<meta name="twitter:title" content="Pastey — Minimal Code Sharing" />
 	<meta
 		name="twitter:description"
@@ -140,6 +166,7 @@
 				onCreatePaste={handleCreatePaste}
 				onSelectRecentPaste={handleSelectRecentPaste}
 				{toast}
+				{editPaste}
 			/>
 		</main>
 

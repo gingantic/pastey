@@ -35,7 +35,7 @@
 			<span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
 		</div>
 		<span class="font-mono text-[10px] text-text-muted">
-			{title}.{lang}
+			{title}
 		</span>
 		<span class="font-mono text-[10px] text-text-muted">
 			{lineNumbers.length} lines

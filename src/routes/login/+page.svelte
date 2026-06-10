@@ -41,20 +41,17 @@
 
 		isSubmitting = true;
 
-		// Small delay to simulate realistic validation check
-		setTimeout(() => {
-			const res = auth.login(emailOrUsername, password);
-			isSubmitting = false;
+		const res = await auth.login(emailOrUsername, password);
+		isSubmitting = false;
 
-			if (res.success) {
-				triggerToast('Welcome back! Logging you in...');
-				setTimeout(() => {
-					goto('/');
-				}, 1000);
-			} else {
-				errorMsg = res.message;
-			}
-		}, 600);
+		if (res.success) {
+			triggerToast('Welcome back! Logging you in...');
+			setTimeout(() => {
+				goto('/');
+			}, 1000);
+		} else {
+			errorMsg = res.message;
+		}
 	}
 </script>
 
@@ -109,28 +106,29 @@
 								disabled={isSubmitting}
 							/>
 
-							<div class="relative">
-								<Input
-									label="// Password"
-									placeholder="••••••••••••"
-									type={showPassword ? 'text' : 'password'}
-									bind:value={password}
-									required
-									disabled={isSubmitting}
-								/>
-								<button
-									type="button"
-									class="absolute right-4 bottom-3 text-text-muted hover:text-white transition-colors"
-									onclick={() => (showPassword = !showPassword)}
-									aria-label="Toggle password visibility"
-								>
-									{#if showPassword}
-										<EyeOff size={16} />
-									{:else}
-										<Eye size={16} />
-									{/if}
-								</button>
-							</div>
+							<Input
+								label="// Password"
+								placeholder="••••••••••••"
+								type={showPassword ? 'text' : 'password'}
+								bind:value={password}
+								required
+								disabled={isSubmitting}
+							>
+								{#snippet iconRight()}
+									<button
+										type="button"
+										class="text-text-muted hover:text-white transition-colors flex items-center justify-center"
+										onclick={() => (showPassword = !showPassword)}
+										aria-label="Toggle password visibility"
+									>
+										{#if showPassword}
+											<EyeOff size={16} />
+										{:else}
+											<Eye size={16} />
+										{/if}
+									</button>
+								{/snippet}
+							</Input>
 						</div>
 
 						<div class="pt-2">

@@ -24,13 +24,15 @@
 		}) => void;
 		onSelectRecentPaste: (paste: RecentPaste) => void;
 		toast: (msg: string) => void;
+		editPaste?: any;
 	}
 
 	let {
 		recentPastes = [],
 		onCreatePaste,
 		onSelectRecentPaste,
-		toast
+		toast,
+		editPaste
 	}: Props = $props();
 
 	// ─── State ───────────────────────────────────────────────────────────────
@@ -94,6 +96,16 @@
 		pasteContent = '';
 		pasteTitle = '';
 	}
+
+	$effect(() => {
+		if (editPaste) {
+			pasteContent = editPaste.content;
+			pasteTitle = editPaste.title;
+			selectedLang = editPaste.lang;
+			selectedExpiry = editPaste.expiry;
+			selectedVisibility = editPaste.visibility;
+		}
+	});
 </script>
 
 <div class="animate-fade-in space-y-8">
@@ -174,7 +186,7 @@
 						variant="primary"
 						onclick={handleCreate}
 					>
-						Create Paste →
+						{editPaste ? 'Update Paste →' : 'Create Paste →'}
 					</Button>
 				</div>
 			</div>

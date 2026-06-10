@@ -1,8 +1,13 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import '../app.css';
+	import { auth } from '$lib/authStore.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
+
+	$effect(() => {
+		auth.setUser(data.user);
+	});
 </script>
 
 <svelte:head>

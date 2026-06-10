@@ -65,20 +65,17 @@
 
 		isSubmitting = true;
 
-		// Small delay to simulate signup logic
-		setTimeout(() => {
-			const res = auth.signup(username.trim(), email.trim(), password);
-			isSubmitting = false;
+		const res = await auth.signup(username.trim(), email.trim(), password);
+		isSubmitting = false;
 
-			if (res.success) {
-				triggerToast('Account created successfully! Logging you in...');
-				setTimeout(() => {
-					goto('/');
-				}, 1000);
-			} else {
-				errorMsg = res.message;
-			}
-		}, 600);
+		if (res.success) {
+			triggerToast('Account created successfully! Logging you in...');
+			setTimeout(() => {
+				goto('/');
+			}, 1000);
+		} else {
+			errorMsg = res.message;
+		}
 	}
 </script>
 
@@ -142,28 +139,29 @@
 								disabled={isSubmitting}
 							/>
 
-							<div class="relative">
-								<Input
-									label="// Password (min. 6 characters)"
-									placeholder="••••••••••••"
-									type={showPassword ? 'text' : 'password'}
-									bind:value={password}
-									required
-									disabled={isSubmitting}
-								/>
-								<button
-									type="button"
-									class="absolute right-4 bottom-3 text-text-muted hover:text-white transition-colors"
-									onclick={() => (showPassword = !showPassword)}
-									aria-label="Toggle password visibility"
-								>
-									{#if showPassword}
-										<EyeOff size={16} />
-									{:else}
-										<Eye size={16} />
-									{/if}
-								</button>
-							</div>
+							<Input
+								label="// Password (min. 6 characters)"
+								placeholder="••••••••••••"
+								type={showPassword ? 'text' : 'password'}
+								bind:value={password}
+								required
+								disabled={isSubmitting}
+							>
+								{#snippet iconRight()}
+									<button
+										type="button"
+										class="text-text-muted hover:text-white transition-colors flex items-center justify-center"
+										onclick={() => (showPassword = !showPassword)}
+										aria-label="Toggle password visibility"
+									>
+										{#if showPassword}
+											<EyeOff size={16} />
+										{:else}
+											<Eye size={16} />
+										{/if}
+									</button>
+								{/snippet}
+							</Input>
 
 							<Input
 								label="// Confirm Password"

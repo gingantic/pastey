@@ -14,7 +14,7 @@
 	<footer class="w-full max-w-6xl px-6 py-8 flex flex-col sm:flex-row justify-between items-start gap-6">
 		<div class="space-y-1">
 			<div class="font-mono text-sm font-bold text-white">
-				Pastey. <span class="font-serif italic font-light text-text-secondary text-sm">by reihan.dev</span>
+				Pastey. <span class="font-serif italic font-light text-text-secondary text-sm">by rhnx.my.id</span>
 			</div>
 			<p class="font-mono text-[10px] text-text-muted">
 				Minimal code snippet sharing.
@@ -24,8 +24,8 @@
 			{#if showBackToPastey}
 				<a href="/" class="hover:text-white transition-colors">← Back to Pastey</a>
 			{/if}
-			<a href="/ui-kit" class="hover:text-white transition-colors">UI Kit</a>
-			<span class="text-text-muted">© {new Date().getFullYear()} reihan.dev</span>
+			<a href="/status" class="hover:text-white transition-colors">System Status</a>
+			<span class="text-text-muted">© {new Date().getFullYear()} rhnx.my.id</span>
 		</div>
 	</footer>
 

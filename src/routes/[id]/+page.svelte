@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { getPasteById } from '$lib/pasteStore';
+	import type { Paste } from '$lib/pasteStore';
 	import PasteViewer from '$lib/components/pastey/PasteViewer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { Check } from '@lucide/svelte';
+	import type { PageData } from './$types';
 
-	let { data } = $props();
-	let paste = $derived(getPasteById(data.id));
+	let { data }: { data: PageData } = $props();
+	
+	let paste = $derived<Paste | null>(data.paste);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
 
 	// Toast state
 	let showToast = $state(false);
@@ -54,28 +58,35 @@
 
 		<!-- Main content -->
 		<main class="w-full max-w-6xl px-6 mt-10 pb-24 min-w-0 flex flex-col justify-center">
-			{#if paste}
-				<PasteViewer
-					{paste}
-					onNewPaste={() => (window.location.href = '/')}
-					{toast}
-				/>
-			{:else}
-				<div class="max-w-md mx-auto text-center py-16 space-y-6 animate-fade-in">
-					<div class="text-6xl">🔍</div>
-					<h2 class="text-2xl font-mono font-bold text-white">Paste Not Found</h2>
-					<p class="text-xs text-text-muted leading-relaxed font-mono">
-						The paste with ID <span class="text-white">"{data.id}"</span> does not exist or has expired.
-					</p>
-					<div class="pt-4">
-						<a
-							href="/"
-							class="inline-flex items-center justify-center bg-white text-black font-mono text-xs font-bold px-6 py-3 rounded-xl hover:bg-white/90 transition-colors"
-						>
-							Create New Paste
-						</a>
-					</div>
+			{#if loading}
+				<div class="max-w-md mx-auto text-center py-24 space-y-6 animate-pulse">
+					<div class="w-10 h-10 border-4 border-white/10 border-t-white rounded-full animate-spin mx-auto"></div>
+					<p class="font-mono text-xs text-text-muted">Loading snippet...</p>
 				</div>
+			{:else}
+				{#if paste}
+					<PasteViewer
+						{paste}
+						onNewPaste={() => (window.location.href = '/')}
+						{toast}
+					/>
+				{:else}
+					<div class="max-w-md mx-auto text-center py-16 space-y-6 animate-fade-in">
+						<div class="text-6xl">🔍</div>
+						<h2 class="text-2xl font-mono font-bold text-white">Paste Not Found</h2>
+						<p class="text-xs text-text-muted leading-relaxed font-mono">
+							The paste with ID <span class="text-white">"{data.id}"</span> does not exist or has expired.
+						</p>
+						<div class="pt-4">
+							<a
+								href="/"
+								class="inline-flex items-center justify-center bg-white text-black font-mono text-xs font-bold px-6 py-3 rounded-xl hover:bg-white/90 transition-colors"
+							>
+								Create New Paste
+							</a>
+						</div>
+					</div>
+				{/if}
 			{/if}
 		</main>
 

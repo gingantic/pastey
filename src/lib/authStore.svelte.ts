@@ -1,96 +1,102 @@
 export interface User {
+	id: string;
 	username: string;
 	email: string;
+	created_at?: string;
+	is_admin?: boolean;
 }
 
 class AuthStore {
 	#currentUser = $state<User | null>(null);
-
-	constructor() {
-		if (typeof window !== 'undefined') {
-			const stored = localStorage.getItem('pastey_user');
-			if (stored) {
-				try {
-					this.#currentUser = JSON.parse(stored);
-				} catch (e) {
-					localStorage.removeItem('pastey_user');
-				}
-			}
-		}
-	}
+	#initialized = $state(false);
 
 	get currentUser() {
 		return this.#currentUser;
 	}
 
-	login(emailOrUsername: string, password: string) {
-		if (typeof window === 'undefined') return { success: false, message: 'Server-side action not allowed.' };
-		
-		const usersStr = localStorage.getItem('pastey_users') || '[]';
-		let users: any[] = [];
-		try {
-			users = JSON.parse(usersStr);
-		} catch (e) {}
+	get initialized() {
+		return this.#initialized;
+	}
 
-		// Seed a default user for testing if no users exist
-		if (users.length === 0) {
-			users.push({
-				username: 'reihan.dev',
-				email: 'reihan@reihan.dev',
-				password: 'password123'
+	setUser(user: User | null) {
+		this.#currentUser = user;
+		this.#initialized = true;
+	}
+
+	async login(emailOrUsername: string, password: string) {
+		try {
+			const res = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ email_or_username: emailOrUsername, password })
 			});
-			localStorage.setItem('pastey_users', JSON.stringify(users));
-		}
 
-		const user = users.find(
-			(u) =>
-				(u.username.toLowerCase() === emailOrUsername.toLowerCase() ||
-					u.email.toLowerCase() === emailOrUsername.toLowerCase()) &&
-				u.password === password
-		);
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				return { success: false, message: err.error || 'Invalid credentials' };
+			}
 
-		if (user) {
-			const loggedInUser: User = { username: user.username, email: user.email };
-			this.#currentUser = loggedInUser;
-			localStorage.setItem('pastey_user', JSON.stringify(loggedInUser));
+			const data = await res.json();
+			this.#currentUser = data.user;
+			this.#initialized = true;
+
 			return { success: true, message: 'Success' };
+		} catch (e: any) {
+			return { success: false, message: e.message || 'Connection error' };
 		}
-
-		return { success: false, message: 'Invalid username/email or password.' };
 	}
 
-	signup(username: string, email: string, password: string) {
-		if (typeof window === 'undefined') return { success: false, message: 'Server-side action not allowed.' };
-
-		const usersStr = localStorage.getItem('pastey_users') || '[]';
-		let users: any[] = [];
+	async signup(username: string, email: string, password: string) {
 		try {
-			users = JSON.parse(usersStr);
-		} catch (e) {}
+			const res = await fetch('/api/auth/signup', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ username, email, password })
+			});
 
-		if (users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
-			return { success: false, message: 'Username is already taken.' };
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				return { success: false, message: err.error || 'Signup failed' };
+			}
+
+			const data = await res.json();
+			this.#currentUser = data.user;
+			this.#initialized = true;
+
+			return { success: true, message: 'Success' };
+		} catch (e: any) {
+			return { success: false, message: e.message || 'Connection error' };
 		}
-
-		if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-			return { success: false, message: 'Email is already registered.' };
-		}
-
-		const newUser = { username, email, password };
-		users.push(newUser);
-		localStorage.setItem('pastey_users', JSON.stringify(users));
-
-		const loggedInUser: User = { username, email };
-		this.#currentUser = loggedInUser;
-		localStorage.setItem('pastey_user', JSON.stringify(loggedInUser));
-
-		return { success: true, message: 'Success' };
 	}
 
-	logout() {
-		if (typeof window === 'undefined') return;
+	async logout() {
+		try {
+			await fetch('/api/auth/logout', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+		} catch (e) {
+			console.error('Logout request failed', e);
+		}
+
 		this.#currentUser = null;
-		localStorage.removeItem('pastey_user');
+		
+		// Clear local states and hard reload to clean everything up
+		if (typeof window !== 'undefined') {
+			window.location.href = '/';
+		}
+	}
+
+	// fetchWithAuth acts as a standard fetch since the browser handles auth cookies automatically.
+	// We keep this method for compatibility.
+	async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+		return fetch(url, options);
 	}
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Badge from '$lib/components/Badge.svelte';
 	import CodeViewer from '$lib/components/pastey/CodeViewer.svelte';
-	import { Check, Copy, Globe, Link, Lock } from '@lucide/svelte';
+	import { Check, Copy, Globe, Link, Lock, FileText } from '@lucide/svelte';
 
 	interface Paste {
 		id: string;
@@ -12,6 +12,7 @@
 		views: number;
 		visibility: 'public' | 'unlisted' | 'private';
 		content: string;
+		expires_at?: string | null;
 	}
 
 	interface Props {
@@ -25,7 +26,7 @@
 	let showCopied = $state(false);
 
 	function copyLink() {
-		const origin = typeof window !== 'undefined' ? window.location.origin : 'https://reihan.dev';
+		const origin = typeof window !== 'undefined' ? window.location.origin : 'https://rhnx.my.id';
 		navigator.clipboard.writeText(`${origin}/${paste.id}`);
 		toast('Link copied to clipboard!');
 	}
@@ -36,6 +37,46 @@
 		showCopied = true;
 		setTimeout(() => (showCopied = false), 2000);
 	}
+	let timeLeft = $state('');
+	let interval: ReturnType<typeof setInterval> | null = null;
+
+	function updateCountdown() {
+		if (!paste.expires_at) {
+			timeLeft = '';
+			return;
+		}
+
+		const now = new Date().getTime();
+		const expiry = new Date(paste.expires_at).getTime();
+		const diff = expiry - now;
+
+		if (diff <= 0) {
+			timeLeft = 'expired';
+			if (interval) clearInterval(interval);
+			return;
+		}
+
+		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+		const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+		const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+		const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+		const parts = [];
+		if (days > 0) parts.push(`${days}d`);
+		if (hours > 0) parts.push(`${hours}h`);
+		if (minutes > 0) parts.push(`${minutes}m`);
+		parts.push(`${seconds}s`);
+
+		timeLeft = parts.join(' ');
+	}
+
+	$effect(() => {
+		updateCountdown();
+		interval = setInterval(updateCountdown, 1000);
+		return () => {
+			if (interval) clearInterval(interval);
+		};
+	});
 </script>
 
 <div class="animate-fade-in space-y-6">
@@ -54,6 +95,10 @@
 				<span>{paste.date}</span>
 				<span class="text-border-light">·</span>
 				<span>{paste.views} views</span>
+				{#if timeLeft}
+					<span class="text-border-light">·</span>
+					<span class="text-red-400">expires in {timeLeft}</span>
+				{/if}
 				<span class="text-border-light">·</span>
 				<span class="flex items-center gap-1 text-text-secondary">
 					{#if paste.visibility === 'public'}
@@ -96,6 +141,15 @@
 					Copy Code
 				{/if}
 			</button>
+			<a
+				id="pastey-raw-btn"
+				href="/raw/{paste.id}"
+				target="_blank"
+				class="inline-flex items-center gap-2 font-mono text-[10px] px-3 py-2 bg-brand-accent border border-border-dim rounded-lg text-text-secondary hover:text-white transition-colors"
+			>
+				<FileText size={12} />
+				Raw
+			</a>
 			<button
 				id="pastey-new-btn"
 				class="inline-flex items-center gap-2 font-mono text-[10px] px-3 py-2 bg-white text-black border border-white rounded-lg hover:bg-white/90 transition-colors"

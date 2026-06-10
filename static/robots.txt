@@ -1,5 +1,3 @@
 # allow crawling everything by default
 User-agent: *
 Disallow:
-
-Sitemap: https://reihan.dev/sitemap.xml
