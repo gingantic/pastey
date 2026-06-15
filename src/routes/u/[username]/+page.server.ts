@@ -1,30 +1,28 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { BACKEND_URL } from '$env/static/private';
+import { mapBackendPaste } from '$lib/pasteStore';
+import * as pastesHandler from '$lib/server/handlers/pastes';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	const username = params.username;
-	const token = cookies.get('pastey_token');
 	
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json'
-	};
-	if (token) {
-		headers['Authorization'] = `Bearer ${token}`;
-	}
+	const currentUser = locals.user ? {
+		user_id: locals.user.id,
+		username: locals.user.username,
+		email: locals.user.email,
+		is_admin: locals.user.is_admin
+	} : null;
 
 	try {
-		const res = await fetch(`${BACKEND_URL}/users/${username}/pastes`, { headers });
-		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
-			throw error(res.status, body.error || 'Failed to load user pastes');
+		const res = await pastesHandler.personalPastes(username, currentUser);
+		if (res.status !== 200 || !res.data) {
+			throw error(res.status, (res && 'error' in res ? res.error : undefined) || 'Failed to load user pastes');
 		}
 
-		const json = await res.json();
 		return {
 			username,
-			pastes: json.pastes ?? [],
-			total: json.total ?? 0
+			pastes: (res.data.pastes ?? []).map(mapBackendPaste),
+			total: res.data.total ?? 0
 		};
 	} catch (e: any) {
 		if (e.status) throw e;

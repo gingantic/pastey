@@ -1,0 +1,218 @@
+import crypto from 'crypto';
+import { getDB } from '../db';
+
+// Generates a 12-char hex string for use as a paste ID (6 bytes).
+function generatePasteId(): string {
+	return crypto.randomBytes(6).toString('hex');
+}
+
+function validVisibility(v: string): string {
+	switch (v) {
+		case 'public':
+		case 'unlisted':
+		case 'private':
+			return v;
+		default:
+			return 'public';
+	}
+}
+
+function validLang(l: string): string {
+	if (!l || l.trim() === '') {
+		return 'plaintext';
+	}
+	return l;
+}
+
+function getExpiresAt(expiry: string): Date | null {
+	let ms = 0;
+	switch (expiry) {
+		case '10m':
+			ms = 10 * 60 * 1000;
+			break;
+		case '1h':
+			ms = 60 * 60 * 1000;
+			break;
+		case '1d':
+			ms = 24 * 60 * 60 * 1000;
+			break;
+		case '1w':
+			ms = 7 * 24 * 60 * 60 * 1000;
+			break;
+		case '1mo':
+			ms = 30 * 24 * 60 * 60 * 1000;
+			break;
+		default:
+			return null; // never or unknown
+	}
+	return new Date(Date.now() + ms);
+}
+
+export async function listPastes(url: URL) {
+	const limitVal = url.searchParams.get('limit');
+	const offsetVal = url.searchParams.get('offset');
+
+	let limit = parseInt(limitVal || '', 10);
+	if (isNaN(limit) || limit <= 0 || limit > 50) {
+		limit = 20;
+	}
+
+	let offset = parseInt(offsetVal || '', 10);
+	if (isNaN(offset) || offset < 0) {
+		offset = 0;
+	}
+
+	const db = await getDB();
+	const result = await db.listPublicPastes(limit, offset);
+	return { status: 200, data: result };
+}
+
+export async function createPaste(body: any, currentUser: any) {
+	const { title, content, lang, expiry, visibility } = body || {};
+
+	if (!content || content.trim() === '') {
+		return { status: 400, error: 'content cannot be empty' };
+	}
+
+	const db = await getDB();
+	const paste = {
+		id: generatePasteId(),
+		title: !title || title.trim() === '' ? 'Untitled' : title.trim(),
+		content: content,
+		lang: validLang(lang),
+		expiry: expiry || 'never',
+		visibility: validVisibility(visibility),
+		author_id: currentUser ? currentUser.user_id : null,
+		author_name: currentUser ? currentUser.username : 'Anonymous',
+		views: 0,
+		created_at: new Date(),
+		updated_at: new Date(),
+		expires_at: getExpiresAt(expiry)
+	};
+
+	await db.createPaste(paste);
+	return { status: 201, data: paste };
+}
+
+export async function getPaste(id: string, currentUser: any): Promise<{ status: number; data?: any; error?: string }> {
+	if (!id) {
+		return { status: 400, error: 'missing paste ID' };
+	}
+
+	const db = await getDB();
+	const paste = await db.getPasteById(id);
+	if (!paste) {
+		return { status: 404, error: 'paste not found' };
+	}
+
+	// Check expiry
+	if (paste.expires_at && new Date(paste.expires_at).getTime() < Date.now()) {
+		await db.deletePaste(id).catch(() => {});
+		return { status: 404, error: 'paste has expired' };
+	}
+
+	// Private visibility check
+	if (paste.visibility === 'private') {
+		const isOwner = currentUser && paste.author_id && currentUser.user_id === paste.author_id;
+		const isAdmin = currentUser && currentUser.is_admin;
+		if (!isOwner && !isAdmin) {
+			return { status: 404, error: 'paste not found' };
+		}
+	}
+
+	// Increment view count asynchronously (fire and forget / backgrounded)
+	db.incrementPasteViews(id).catch(err => console.error('Failed to increment views:', err));
+	paste.views++; // Increment locally for the response
+
+	return { status: 200, data: paste };
+}
+
+export async function updatePaste(id: string, body: any, currentUser: any): Promise<{ status: number; data?: any; error?: string }> {
+	if (!id) {
+		return { status: 400, error: 'missing paste ID' };
+	}
+
+	const db = await getDB();
+	const paste = await db.getPasteById(id);
+	if (!paste) {
+		return { status: 404, error: 'paste not found' };
+	}
+
+	// Check ownership/admin privileges
+	const isOwner = currentUser && paste.author_id && currentUser.user_id === paste.author_id;
+	const isAdmin = currentUser && currentUser.is_admin;
+	if (!isOwner && !isAdmin) {
+		return { status: 403, error: 'forbidden: you do not own this paste' };
+	}
+
+	const { title, content, lang, expiry, visibility } = body || {};
+	if (!content || content.trim() === '') {
+		return { status: 400, error: 'content cannot be empty' };
+	}
+
+	const updates = {
+		title: !title || title.trim() === '' ? 'Untitled' : title.trim(),
+		content,
+		lang: validLang(lang),
+		expiry: expiry || 'never',
+		visibility: validVisibility(visibility),
+		expires_at: getExpiresAt(expiry)
+	};
+
+	await db.updatePaste(id, updates);
+	
+	const updated = await db.getPasteById(id);
+	return { status: 200, data: updated };
+}
+
+export async function deletePaste(id: string, currentUser: any): Promise<{ status: number; data?: any; error?: string }> {
+	if (!id) {
+		return { status: 400, error: 'missing paste ID' };
+	}
+
+	const db = await getDB();
+	const paste = await db.getPasteById(id);
+	if (!paste) {
+		return { status: 404, error: 'paste not found' };
+	}
+
+	// Check ownership/admin privileges
+	const isOwner = currentUser && paste.author_id && currentUser.user_id === paste.author_id;
+	const isAdmin = currentUser && currentUser.is_admin;
+	if (!isOwner && !isAdmin) {
+		return { status: 403, error: 'forbidden: you do not own this paste' };
+	}
+
+	await db.deletePaste(id);
+	return { status: 200, data: { message: 'paste deleted successfully' } };
+}
+
+export async function myPastes(currentUser: any): Promise<{ status: number; data?: any; error?: string }> {
+	if (!currentUser) {
+		return { status: 401, error: 'could not resolve user ID' };
+	}
+
+	const db = await getDB();
+	const result = await db.listPastesByAuthorId(currentUser.user_id);
+	return { status: 200, data: result };
+}
+
+export async function personalPastes(username: string, currentUser: any): Promise<{ status: number; data?: any; error?: string }> {
+	if (!username) {
+		return { status: 400, error: 'missing username' };
+	}
+
+	const showAll = currentUser && currentUser.username.toLowerCase() === username.toLowerCase();
+	
+	const db = await getDB();
+	const result = await db.listPastesByAuthorName(username, showAll);
+	return { status: 200, data: result };
+}
+
+export async function getRawPaste(id: string, currentUser: any): Promise<{ status: number; rawContent?: string; error?: string }> {
+	const res = await getPaste(id, currentUser);
+	if (res.status !== 200 || !res.data) {
+		return { status: res.status, error: res.error || 'Failed to fetch raw paste' };
+	}
+	return { status: 200, rawContent: res.data.content };
+}

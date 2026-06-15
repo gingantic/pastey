@@ -1,29 +1,30 @@
 import type { PageServerLoad } from './$types';
 import { mapBackendPaste } from '$lib/pasteStore';
 import { error } from '@sveltejs/kit';
-import { BACKEND_URL } from '$env/static/private';
+import * as pastesHandler from '$lib/server/handlers/pastes';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	const id = params.id;
-	const token = cookies.get('pastey_token');
 	
-	const headers: Record<string, string> = {};
-	if (token) {
-		headers['Authorization'] = `Bearer ${token}`;
-	}
+	const currentUser = locals.user ? {
+		user_id: locals.user.id,
+		username: locals.user.username,
+		email: locals.user.email,
+		is_admin: locals.user.is_admin
+	} : null;
 
 	try {
-		const res = await fetch(`${BACKEND_URL}/pastes/${id}`, { headers });
-		if (!res.ok) {
+		const res = await pastesHandler.getPaste(id, currentUser);
+		
+		if (res.status !== 200) {
 			if (res.status === 404) {
 				return { paste: null, id };
 			}
-			throw error(res.status, 'Failed to fetch paste');
+			throw error(res.status, res.error || 'Failed to fetch paste');
 		}
 
-		const data = await res.json();
 		return {
-			paste: mapBackendPaste(data),
+			paste: mapBackendPaste(res.data),
 			id
 		};
 	} catch (e: any) {

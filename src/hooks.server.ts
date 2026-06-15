@@ -1,17 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
-import { BACKEND_URL } from '$env/static/private';
-
-function decodeJwt(token: string) {
-	try {
-		const parts = token.split('.');
-		if (parts.length !== 3) return null;
-		const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
-		return JSON.parse(payload);
-	} catch (e) {
-		return null;
-	}
-}
+import { verifyAccessToken } from '$lib/server/auth';
+import * as authHandler from '$lib/server/handlers/auth';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get('pastey_token');
@@ -20,43 +10,36 @@ export const handle: Handle = async ({ event, resolve }) => {
 	let user = null;
 
 	if (token) {
-		const claims = decodeJwt(token);
+		const claims = await verifyAccessToken(token);
 		if (claims) {
-			const isExpired = claims.exp ? claims.exp * 1000 < Date.now() : true;
-			if (!isExpired) {
-				user = {
-					id: claims.user_id || claims.sub,
-					username: claims.username,
-					email: claims.email,
-					is_admin: !!claims.is_admin
-				};
-			}
+			user = {
+				id: claims.user_id,
+				username: claims.username,
+				email: claims.email,
+				is_admin: claims.is_admin
+			};
 		}
 	}
 
 	// If token was missing/expired but refresh token is present, try server-side refresh
 	if (!user && refreshToken) {
 		try {
-			const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ refresh_token: refreshToken })
-			});
+			const res = await authHandler.refresh({ refresh_token: refreshToken });
 
-			if (response.ok) {
-				const data = await response.json();
+			if (res.status === 200 && res.data) {
+				const { tokens, user: profile } = res.data;
+				
 				// Update access token cookie (valid for 15 mins)
-				event.cookies.set('pastey_token', data.tokens.access_token, {
+				event.cookies.set('pastey_token', tokens.access_token, {
 					path: '/',
 					httpOnly: true,
 					secure: !dev,
 					sameSite: 'lax',
 					maxAge: 15 * 60
 				});
+				
 				// Update refresh token cookie (valid for 30 days)
-				event.cookies.set('pastey_refresh_token', data.tokens.refresh_token, {
+				event.cookies.set('pastey_refresh_token', tokens.refresh_token, {
 					path: '/',
 					httpOnly: true,
 					secure: !dev,
@@ -65,10 +48,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 				});
 
 				user = {
-					id: data.user.id,
-					username: data.user.username,
-					email: data.user.email,
-					is_admin: !!data.user.is_admin
+					id: profile.id,
+					username: profile.username,
+					email: profile.email,
+					is_admin: profile.is_admin
 				};
 			} else {
 				// Refresh token invalid/expired, clear cookies
