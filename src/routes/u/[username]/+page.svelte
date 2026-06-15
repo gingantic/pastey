@@ -4,24 +4,10 @@
 	import { auth } from '$lib/authStore.svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { Check, Globe, Lock, Link, ArrowRight, User, Trash2, Pencil, Copy } from '@lucide/svelte';
-	import { deletePaste } from '$lib/pasteStore';
+	import { deletePaste, type Paste } from '$lib/pasteStore';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	// ─── Types ───────────────────────────────────────────────────────────────
-	interface Paste {
-		id: string;
-		title: string;
-		content: string;
-		lang: string;
-		expiry: string;
-		visibility: 'public' | 'unlisted' | 'private';
-		author_name: string;
-		views: number;
-		created_at: string;
-		expires_at: string | null;
-	}
 
 	// ─── State ───────────────────────────────────────────────────────────────
 	let pastes = $state<Paste[]>([]);
@@ -51,22 +37,6 @@
 		toastTimeout = setTimeout(() => (showToast = false), 3000);
 	}
 
-	function formatDate(dateStr: string) {
-		const d = new Date(dateStr);
-		const options: Intl.DateTimeFormatOptions = {
-			month: 'long',
-			day: 'numeric',
-			year: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit',
-			hour12: true
-		};
-		const formatted = d.toLocaleString('en-US', options);
-		return formatted
-			.replace(' at ', ', ')
-			.replace(' AM', ' a.m.')
-			.replace(' PM', ' p.m.');
-	}
 
 	function formatExpiry(expiry: string) {
 		switch (expiry) {
@@ -244,7 +214,7 @@
 										</div>
 									</td>
 									<td class="px-6 py-4 text-text-muted">
-										{formatDate(paste.created_at)}
+										{paste.date}
 									</td>
 									<td class="px-6 py-4 text-text-muted capitalize">
 										{formatExpiry(paste.expiry)}
