@@ -24,7 +24,6 @@
 			{#if showBackToPastey}
 				<a href="/" class="hover:text-white transition-colors">← Back to Pastey</a>
 			{/if}
-			<a href="/status" class="hover:text-white transition-colors">System Status</a>
 			<span class="text-text-muted">© {new Date().getFullYear()} rhnx.my.id</span>
 		</div>
 	</footer>
