@@ -123,14 +123,6 @@
 					</div>
 
 					<div class="flex items-center gap-3">
-						{#if isOwnProfile}
-							<span
-								class="inline-flex items-center gap-1.5 font-mono text-[10px] px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400"
-							>
-								<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-								Your Profile
-							</span>
-						{/if}
 						<span
 							class="font-mono text-[10px] px-3 py-1.5 bg-brand-accent border border-border-dim rounded-lg text-text-muted"
 						>
