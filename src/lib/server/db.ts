@@ -83,14 +83,31 @@ export async function getDB(): Promise<DBAdapter> {
 
 	const isPostgres = DB_TYPE?.toLowerCase() === 'postgres' || DB_TYPE?.toLowerCase() === 'postgresql';
 	
+	let baseDb: DBAdapter;
 	if (isPostgres) {
 		const { PostgresAdapter } = await import('./db.postgres');
-		dbInstance = new PostgresAdapter(DATABASE_URL);
+		baseDb = new PostgresAdapter(DATABASE_URL);
 	} else {
 		const { SqliteAdapter } = await import('./db.sqlite');
-		dbInstance = new SqliteAdapter(DATABASE_URL || 'pastey.db');
+		baseDb = new SqliteAdapter(DATABASE_URL || 'pastey.db');
 	}
 
-	await dbInstance.init();
+	await baseDb.init();
+
+	try {
+		const { getRedisClient } = await import('./redis');
+		const redis = await getRedisClient();
+		if (redis) {
+			const { RedisAdapterWrapper } = await import('./db.redis');
+			dbInstance = new RedisAdapterWrapper(baseDb, redis);
+		} else {
+			dbInstance = baseDb;
+		}
+	} catch (err) {
+		console.error('Failed to initialize Redis wrapper, using base DB:', err);
+		dbInstance = baseDb;
+	}
+
 	return dbInstance;
 }
+
