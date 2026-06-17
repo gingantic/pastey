@@ -125,7 +125,7 @@ async function handleRouter(event: any) {
 				cookies.set('pastey_token', data.tokens.access_token, {
 					path: '/',
 					httpOnly: true,
-					secure: !dev,
+					secure: url.protocol === 'https:',
 					sameSite: 'lax',
 					maxAge: 15 * 60 // 15 mins
 				});
@@ -133,7 +133,7 @@ async function handleRouter(event: any) {
 				cookies.set('pastey_refresh_token', data.tokens.refresh_token, {
 					path: '/',
 					httpOnly: true,
-					secure: !dev,
+					secure: url.protocol === 'https:',
 					sameSite: 'lax',
 					maxAge: 30 * 24 * 60 * 60 // 30 days
 				});

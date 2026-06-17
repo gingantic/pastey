@@ -33,7 +33,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				event.cookies.set('pastey_token', tokens.access_token, {
 					path: '/',
 					httpOnly: true,
-					secure: !dev,
+					secure: event.url.protocol === 'https:',
 					sameSite: 'lax',
 					maxAge: 15 * 60
 				});
@@ -42,7 +42,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				event.cookies.set('pastey_refresh_token', tokens.refresh_token, {
 					path: '/',
 					httpOnly: true,
-					secure: !dev,
+					secure: event.url.protocol === 'https:',
 					sameSite: 'lax',
 					maxAge: 30 * 24 * 60 * 60
 				});

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/authStore.svelte';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import Input from '$lib/components/Input.svelte';
@@ -46,7 +46,8 @@
 
 		if (res.success) {
 			triggerToast('Welcome back! Logging you in...');
-			setTimeout(() => {
+			setTimeout(async () => {
+				await invalidateAll();
 				goto('/');
 			}, 1000);
 		} else {
