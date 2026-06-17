@@ -1,9 +1,14 @@
 import crypto from 'crypto';
 import { getDB } from '../db';
 
-// Generates a 12-char hex string for use as a paste ID (6 bytes).
-function generatePasteId(): string {
-	return crypto.randomBytes(6).toString('hex');
+// Generates a case-sensitive random alphanumeric string of the specified length for use as a paste ID.
+function generatePasteId(length = 4): string {
+	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	let id = '';
+	for (let i = 0; i < length; i++) {
+		id += chars[crypto.randomInt(0, chars.length)];
+	}
+	return id;
 }
 
 function validVisibility(v: string): string {
@@ -75,8 +80,20 @@ export async function createPaste(body: any, currentUser: any) {
 	}
 
 	const db = await getDB();
+
+	let idLength = 4;
+	let uniqueId = '';
+	while (true) {
+		uniqueId = generatePasteId(idLength);
+		const existing = await db.getPasteById(uniqueId);
+		if (!existing) {
+			break;
+		}
+		idLength++;
+	}
+
 	const paste = {
-		id: generatePasteId(),
+		id: uniqueId,
 		title: !title || title.trim() === '' ? 'Untitled' : title.trim(),
 		content: content,
 		lang: validLang(lang),

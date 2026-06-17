@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import crypto from 'crypto';
 import { getDB } from '../db';
 import { createPaste, getPaste, deletePaste, updatePaste } from './pastes';
 
@@ -35,7 +36,7 @@ describe('Pastes Handlers', () => {
 			}, null);
 
 			expect(createRes.status).toBe(201);
-			expect(createRes.data!.id).toHaveLength(12);
+			expect(createRes.data!.id).toHaveLength(4);
 			expect(createRes.data!.author_name).toBe('Anonymous');
 
 			const pasteId = createRes.data!.id;
@@ -111,6 +112,54 @@ describe('Pastes Handlers', () => {
 			// Paste should be lazy deleted from the database
 			const dbPaste = await db.getPasteById(expiredPaste.id);
 			expect(dbPaste).toBeNull();
+		});
+	});
+
+	describe('ID Collision Handling', () => {
+		it('should append a character when ID collision occurs', async () => {
+			const db = await getDB();
+			const mockRandomInt = vi.spyOn(crypto, 'randomInt');
+			
+			// Mock randomInt to return 0 ('A') for the first 4 calls,
+			// then 1 ('B') for subsequent calls.
+			let callCount = 0;
+			mockRandomInt.mockImplementation(() => {
+				callCount++;
+				if (callCount <= 4) {
+					return 0; // index 0 is 'A'
+				} else {
+					return 1; // index 1 is 'B'
+				}
+			});
+
+			// Create a paste that has ID 'AAAA'
+			await db.createPaste({
+				id: 'AAAA',
+				title: 'Existing Paste',
+				content: 'already here',
+				lang: 'plaintext',
+				expiry: 'never',
+				visibility: 'public',
+				author_id: null,
+				author_name: 'Anonymous',
+				views: 0,
+				created_at: new Date(),
+				updated_at: new Date(),
+				expires_at: null
+			});
+
+			// Create a new paste. The first attempt will try 'AAAA' and collide.
+			// The second attempt will generate a 5-char ID 'BBBBB', which will succeed.
+			const res = await createPaste({
+				title: 'New Paste',
+				content: 'hello',
+			}, null);
+
+			expect(res.status).toBe(201);
+			expect(res.data!.id).toBe('BBBBB');
+			expect(res.data!.id).toHaveLength(5);
+
+			mockRandomInt.mockRestore();
 		});
 	});
 });
