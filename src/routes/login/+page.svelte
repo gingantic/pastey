@@ -68,7 +68,20 @@
 		class="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[250px] bg-white/[0.015] rounded-full blur-[140px] pointer-events-none"
 	></div>
 
-	<Header subtitle="Login" tag="// gettin bro" />
+	<Header subtitle="Login" tag="// gettin bro">
+		<a
+			href="/"
+			class="px-4 py-2 rounded-lg transition-colors border bg-brand-accent text-text-secondary border-border-dim hover:text-white"
+		>
+			New Paste
+		</a>
+		<a
+			href="/signup"
+			class="px-4 py-2 rounded-lg transition-colors border bg-brand-accent text-text-secondary border-border-dim hover:text-white"
+		>
+			Sign Up
+		</a>
+	</Header>
 
 	<!-- ── CONTENT ROW ─────────────────────────────────────────────────────── -->
 	<div class="w-full flex flex-1 relative z-10">
