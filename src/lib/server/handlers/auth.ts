@@ -8,7 +8,10 @@ import {
 	hashToken 
 } from '../auth';
 
-const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+import { JWT_REFRESH_EXPIRY_SECONDS } from '$env/static/private';
+
+const refreshExpiry = JWT_REFRESH_EXPIRY_SECONDS ? parseInt(JWT_REFRESH_EXPIRY_SECONDS, 10) : 30 * 24 * 60 * 60;
+const REFRESH_TOKEN_TTL = refreshExpiry * 1000; // in ms
 
 export async function signup(body: any) {
 	const { username, email, password } = body || {};

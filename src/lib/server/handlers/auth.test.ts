@@ -102,5 +102,24 @@ describe('Auth Handlers', () => {
 			const failRefresh = await refresh({ refresh_token: refreshRes.data!.tokens.refresh_token });
 			expect(failRefresh.status).toBe(401);
 		});
+
+		it('should reject a rotated/stolen refresh token after rotation', async () => {
+			const signupRes = await signup({
+				username: 'alice',
+				email: 'alice@example.com',
+				password: 'password12345'
+			});
+
+			const originalRefreshToken = signupRes.data!.tokens.refresh_token;
+
+			// 1. Refresh once (rotates the token)
+			const refreshRes = await refresh({ refresh_token: originalRefreshToken });
+			expect(refreshRes.status).toBe(200);
+
+			// 2. Try to use the original (stolen/old) refresh token again
+			const reuseRes = await refresh({ refresh_token: originalRefreshToken });
+			expect(reuseRes.status).toBe(401);
+			expect(reuseRes.error).toContain('invalid or expired refresh token');
+		});
 	});
 });

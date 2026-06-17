@@ -6,6 +6,10 @@ import * as statusHandler from '$lib/server/handlers/status';
 import * as authHandler from '$lib/server/handlers/auth';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import * as adminHandler from '$lib/server/handlers/admin';
+import { JWT_ACCESS_EXPIRY_SECONDS, JWT_REFRESH_EXPIRY_SECONDS } from '$env/static/private';
+
+const accessExpiry = JWT_ACCESS_EXPIRY_SECONDS ? parseInt(JWT_ACCESS_EXPIRY_SECONDS, 10) : 15 * 60;
+const refreshExpiry = JWT_REFRESH_EXPIRY_SECONDS ? parseInt(JWT_REFRESH_EXPIRY_SECONDS, 10) : 30 * 24 * 60 * 60;
 
 async function getCurrentUser(event: any) {
 	if (event.locals.user) {
@@ -61,10 +65,10 @@ async function handleRouter(event: any) {
 				res = await authHandler.login(body);
 			} else if (parts[1] === 'refresh' && method === 'POST') {
 				// Fallback: read refresh token from body or cookies
-				const token = body?.refresh_token || cookies.get('pastey_refresh_token');
+				const token = body?.refresh_token || cookies.get('_auth');
 				res = await authHandler.refresh({ refresh_token: token });
 			} else if (parts[1] === 'logout' && method === 'POST') {
-				const token = body?.refresh_token || cookies.get('pastey_refresh_token');
+				const token = body?.refresh_token || cookies.get('_auth');
 				res = await authHandler.logout({ refresh_token: token });
 			} else if (parts[1] === 'me' && method === 'GET') {
 				res = await authHandler.getMe(user?.user_id);
@@ -122,20 +126,20 @@ async function handleRouter(event: any) {
 			// Manage cookies for Authentication
 			if (path === 'auth/login' || path === 'auth/signup' || path === 'auth/refresh') {
 				const data = res.data;
-				cookies.set('pastey_token', data.tokens.access_token, {
+				cookies.set('_sess', data.tokens.access_token, {
 					path: '/',
 					httpOnly: true,
 					secure: url.protocol === 'https:',
 					sameSite: 'lax',
-					maxAge: 15 * 60 // 15 mins
+					maxAge: accessExpiry
 				});
 
-				cookies.set('pastey_refresh_token', data.tokens.refresh_token, {
+				cookies.set('_auth', data.tokens.refresh_token, {
 					path: '/',
 					httpOnly: true,
 					secure: url.protocol === 'https:',
 					sameSite: 'lax',
-					maxAge: 30 * 24 * 60 * 60 // 30 days
+					maxAge: refreshExpiry
 				});
 
 				// Return user profile and conceal raw tokens
@@ -143,8 +147,8 @@ async function handleRouter(event: any) {
 			}
 			
 			if (path === 'auth/logout') {
-				cookies.delete('pastey_token', { path: '/' });
-				cookies.delete('pastey_refresh_token', { path: '/' });
+				cookies.delete('_sess', { path: '/' });
+				cookies.delete('_auth', { path: '/' });
 				return json(res.data, { status: res.status });
 			}
 

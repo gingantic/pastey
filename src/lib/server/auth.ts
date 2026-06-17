@@ -1,9 +1,16 @@
+import { dev, building } from '$app/environment';
 import * as jose from 'jose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { JWT_SECRET } from '$env/static/private';
+import { JWT_SECRET, JWT_ACCESS_EXPIRY_SECONDS } from '$env/static/private';
+
+if (!dev && !building && (!JWT_SECRET || JWT_SECRET === 'pastey-dev-secret-key-minimum-32chars!')) {
+	throw new Error('FATAL: JWT_SECRET environment variable is missing or insecure in production.');
+}
 
 const secretKey = new TextEncoder().encode(JWT_SECRET || 'pastey-dev-secret-key-minimum-32chars!');
+
+const accessExpiry = JWT_ACCESS_EXPIRY_SECONDS ? parseInt(JWT_ACCESS_EXPIRY_SECONDS, 10) : 15 * 60;
 
 export async function generateAccessToken(user: { id: string; username: string; email: string; is_admin: boolean }): Promise<string> {
 	return new jose.SignJWT({
@@ -15,7 +22,7 @@ export async function generateAccessToken(user: { id: string; username: string; 
 		.setProtectedHeader({ alg: 'HS256' })
 		.setIssuedAt()
 		.setIssuer('pastey')
-		.setExpirationTime('15m')
+		.setExpirationTime(Math.floor(Date.now() / 1000) + accessExpiry)
 		.sign(secretKey);
 }
 

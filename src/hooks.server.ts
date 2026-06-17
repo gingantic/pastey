@@ -2,10 +2,14 @@ import type { Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { verifyAccessToken } from '$lib/server/auth';
 import * as authHandler from '$lib/server/handlers/auth';
+import { JWT_ACCESS_EXPIRY_SECONDS, JWT_REFRESH_EXPIRY_SECONDS } from '$env/static/private';
+
+const accessExpiry = JWT_ACCESS_EXPIRY_SECONDS ? parseInt(JWT_ACCESS_EXPIRY_SECONDS, 10) : 15 * 60;
+const refreshExpiry = JWT_REFRESH_EXPIRY_SECONDS ? parseInt(JWT_REFRESH_EXPIRY_SECONDS, 10) : 30 * 24 * 60 * 60;
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const token = event.cookies.get('pastey_token');
-	const refreshToken = event.cookies.get('pastey_refresh_token');
+	const token = event.cookies.get('_sess');
+	const refreshToken = event.cookies.get('_auth');
 
 	let user = null;
 
@@ -30,21 +34,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 				const { tokens, user: profile } = res.data;
 				
 				// Update access token cookie (valid for 15 mins)
-				event.cookies.set('pastey_token', tokens.access_token, {
+				event.cookies.set('_sess', tokens.access_token, {
 					path: '/',
 					httpOnly: true,
 					secure: event.url.protocol === 'https:',
 					sameSite: 'lax',
-					maxAge: 15 * 60
+					maxAge: accessExpiry
 				});
 				
 				// Update refresh token cookie (valid for 30 days)
-				event.cookies.set('pastey_refresh_token', tokens.refresh_token, {
+				event.cookies.set('_auth', tokens.refresh_token, {
 					path: '/',
 					httpOnly: true,
 					secure: event.url.protocol === 'https:',
 					sameSite: 'lax',
-					maxAge: 30 * 24 * 60 * 60
+					maxAge: refreshExpiry
 				});
 
 				user = {
@@ -55,8 +59,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 				};
 			} else {
 				// Refresh token invalid/expired, clear cookies
-				event.cookies.delete('pastey_token', { path: '/' });
-				event.cookies.delete('pastey_refresh_token', { path: '/' });
+				event.cookies.delete('_sess', { path: '/' });
+				event.cookies.delete('_auth', { path: '/' });
 			}
 		} catch (err) {
 			console.error('Failed transparent token refresh in hooks:', err);
