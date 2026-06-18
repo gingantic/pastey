@@ -118,6 +118,8 @@ async function handleRouter(event: any) {
 				}
 			} else if (parts[1] === 'pastes' && method === 'GET') {
 				res = await adminHandler.listPastes(url, user);
+			} else if (parts[1] === 'status' && method === 'GET') {
+				res = await statusHandler.getDetailedStatus(user);
 			}
 		}
 		

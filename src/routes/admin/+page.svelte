@@ -13,11 +13,18 @@
 		ChevronLeft, 
 		ChevronRight, 
 		Check,
-		AlertTriangle
+		AlertTriangle,
+		Activity,
+		Database,
+		Server,
+		RefreshCw,
+		Wifi,
+		WifiOff,
+		Zap
 	} from '@lucide/svelte';
 
 	// ─── Tabs & Loading ───────────────────────────────────────────────────────
-	let activeTab = $state<'users' | 'pastes'>('users');
+	let activeTab = $state<'users' | 'pastes' | 'status'>('users');
 	let isLoading = $state(false);
 
 	// ─── User Management State ────────────────────────────────────────────────
@@ -26,6 +33,38 @@
 	let userLimit = 10;
 	let totalUsers = $state(0);
 	let usersList = $state<any[]>([]);
+
+	// ─── Status Tab State ────────────────────────────────────────────────────
+	type ServiceStatus = 'connected' | 'disabled' | 'error';
+	interface StatusData {
+		timestamp: string;
+		database: { status: 'connected' | 'error'; type: string; latency_ms: number | null };
+		redis: { status: ServiceStatus; latency_ms: number | null };
+	}
+	let statusData = $state<StatusData | null>(null);
+	let statusLoading = $state(false);
+	let statusError = $state('');
+	let statusRefreshing = $state(false);
+
+	async function loadStatus(silent = false) {
+		if (!silent) statusLoading = true;
+		statusRefreshing = true;
+		statusError = '';
+		try {
+			const res = await fetch('/api/admin/status');
+			if (res.ok) {
+				statusData = await res.json();
+			} else {
+				const err = await res.json().catch(() => ({}));
+				statusError = err.error || 'Failed to load status';
+			}
+		} catch (e: any) {
+			statusError = e.message || 'Connection error';
+		} finally {
+			statusLoading = false;
+			statusRefreshing = false;
+		}
+	}
 
 	// ─── Paste Management State ───────────────────────────────────────────────
 	let pasteSearch = $state('');
@@ -95,8 +134,10 @@
 	$effect(() => {
 		if (activeTab === 'users') {
 			loadUsers();
-		} else {
+		} else if (activeTab === 'pastes') {
 			loadPastes();
+		} else if (activeTab === 'status') {
+			loadStatus();
 		}
 	});
 
@@ -267,15 +308,25 @@
 					>
 						<FileText size={12} class="opacity-70" /> Pastes List
 					</button>
+					<button 
+						class="px-4 py-1.5 rounded-lg font-mono text-[10px] font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 {activeTab === 'status' ? 'bg-brand-accent text-white border border-border-light shadow-sm' : 'text-text-muted hover:text-white border border-transparent'}"
+						onclick={() => { activeTab = 'status'; }}
+					>
+						<Activity size={12} class="opacity-70" /> System Status
+					</button>
 				</div>
 				
 				{#if activeTab === 'users'}
 					<div class="text-[9px] font-mono text-text-muted uppercase tracking-wider">
 						// SHOWING {usersList.length} OF {totalUsers} USERS
 					</div>
-				{:else}
+				{:else if activeTab === 'pastes'}
 					<div class="text-[9px] font-mono text-text-muted uppercase tracking-wider">
 						// SHOWING {pastesList.length} OF {totalPastes} PASTES
+					</div>
+				{:else if activeTab === 'status' && statusData}
+					<div class="text-[9px] font-mono text-text-muted uppercase tracking-wider">
+						// LAST CHECKED {new Date(statusData.timestamp).toLocaleTimeString()}
 					</div>
 				{/if}
 			</div>
@@ -496,6 +547,153 @@
 							>
 								<ChevronRight size={14} />
 							</button>
+						</div>
+					{/if}
+				</div>
+			{:else if activeTab === 'status'}
+				<!-- Status Tab -->
+				<div class="space-y-6">
+
+					<!-- Refresh button -->
+					<div class="flex justify-end">
+						<button
+							onclick={() => loadStatus()}
+							disabled={statusRefreshing}
+							class="flex items-center gap-2 px-4 py-2 bg-brand-surface/60 border border-border-dim rounded-xl font-mono text-[10px] text-text-muted hover:text-white hover:border-border-light transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+						>
+							<RefreshCw size={12} class="{statusRefreshing ? 'animate-spin' : ''}" />
+							{statusRefreshing ? 'Checking...' : 'Refresh'}
+						</button>
+					</div>
+
+					{#if statusLoading}
+						<!-- Skeleton loader -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+							{#each [1, 2] as _}
+								<div class="bg-brand-surface/40 border border-border-dim rounded-2xl p-6 animate-pulse">
+									<div class="h-4 bg-white/5 rounded w-1/3 mb-4"></div>
+									<div class="h-8 bg-white/5 rounded w-1/2 mb-3"></div>
+									<div class="h-3 bg-white/5 rounded w-2/3"></div>
+								</div>
+							{/each}
+						</div>
+					{:else if statusError}
+						<div class="flex items-center gap-3 bg-red-500/5 border border-red-500/20 rounded-2xl px-6 py-5 font-mono text-xs text-red-400">
+							<AlertTriangle size={15} />
+							<span>{statusError}</span>
+						</div>
+					{:else if statusData}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+							<!-- Database Card -->
+							<div class="bg-brand-surface/40 backdrop-blur-xl border {statusData.database.status === 'connected' ? 'border-green-500/25' : 'border-red-500/25'} rounded-2xl p-6 shadow-glass relative overflow-hidden">
+								<!-- glow blob -->
+								<div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none {statusData.database.status === 'connected' ? 'bg-green-500/10' : 'bg-red-500/10'}"></div>
+								<div class="relative">
+									<div class="flex items-center justify-between mb-5">
+										<div class="flex items-center gap-2.5">
+											<div class="p-2 bg-white/5 border border-border-dim rounded-xl text-text-secondary">
+												<Database size={14} />
+											</div>
+											<div>
+												<div class="text-[9px] text-text-muted font-mono uppercase tracking-wider">Database</div>
+												<div class="text-xs text-white font-mono font-bold uppercase">{statusData.database.type}</div>
+											</div>
+										</div>
+										<!-- Status badge -->
+										{#if statusData.database.status === 'connected'}
+											<div class="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/25 rounded-full">
+												<span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+												<span class="text-[9px] font-mono font-bold text-green-400 uppercase tracking-wider">Online</span>
+											</div>
+										{:else}
+											<div class="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/25 rounded-full">
+												<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+												<span class="text-[9px] font-mono font-bold text-red-400 uppercase tracking-wider">Error</span>
+											</div>
+										{/if}
+									</div>
+									<!-- Latency display -->
+									<div class="flex items-end gap-2 mt-2">
+										<div class="flex items-center gap-1.5 text-text-muted">
+											<Zap size={11} class="text-amber-400" />
+											<span class="text-[9px] font-mono uppercase tracking-wider">Latency</span>
+										</div>
+										{#if statusData.database.latency_ms !== null}
+											<span class="text-2xl font-bold font-mono text-white leading-none">{statusData.database.latency_ms}</span>
+											<span class="text-xs text-text-muted font-mono mb-0.5">ms</span>
+										{:else}
+											<span class="text-2xl font-bold font-mono text-text-muted leading-none">—</span>
+										{/if}
+									</div>
+									<div class="mt-4 pt-4 border-t border-border-dim/50 flex items-center gap-1.5 text-[9px] font-mono text-text-muted uppercase tracking-wider">
+										<Check size={10} class="{statusData.database.status === 'connected' ? 'text-green-400' : 'text-red-400'}" />
+										{statusData.database.status === 'connected' ? 'Connection verified via query round-trip' : 'Unable to reach database'}
+									</div>
+								</div>
+							</div>
+
+							<!-- Redis Card -->
+							<div class="bg-brand-surface/40 backdrop-blur-xl border {statusData.redis.status === 'connected' ? 'border-cyan-500/25' : statusData.redis.status === 'disabled' ? 'border-border-dim' : 'border-red-500/25'} rounded-2xl p-6 shadow-glass relative overflow-hidden">
+								<!-- glow blob -->
+								<div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none {statusData.redis.status === 'connected' ? 'bg-cyan-500/10' : statusData.redis.status === 'disabled' ? 'bg-white/[0.02]' : 'bg-red-500/10'}"></div>
+								<div class="relative">
+									<div class="flex items-center justify-between mb-5">
+										<div class="flex items-center gap-2.5">
+											<div class="p-2 bg-white/5 border border-border-dim rounded-xl text-text-secondary">
+												<Server size={14} />
+											</div>
+											<div>
+												<div class="text-[9px] text-text-muted font-mono uppercase tracking-wider">Cache</div>
+												<div class="text-xs text-white font-mono font-bold uppercase">Redis</div>
+											</div>
+										</div>
+										<!-- Status badge -->
+										{#if statusData.redis.status === 'connected'}
+											<div class="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/25 rounded-full">
+												<span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+												<span class="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-wider">Online</span>
+											</div>
+										{:else if statusData.redis.status === 'disabled'}
+											<div class="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.03] border border-border-dim rounded-full">
+												<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
+												<span class="text-[9px] font-mono font-bold text-text-muted uppercase tracking-wider">Disabled</span>
+											</div>
+										{:else}
+											<div class="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/25 rounded-full">
+												<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+												<span class="text-[9px] font-mono font-bold text-red-400 uppercase tracking-wider">Error</span>
+											</div>
+										{/if}
+									</div>
+									<!-- Latency display -->
+									<div class="flex items-end gap-2 mt-2">
+										<div class="flex items-center gap-1.5 text-text-muted">
+											<Zap size={11} class="text-amber-400" />
+											<span class="text-[9px] font-mono uppercase tracking-wider">PING Latency</span>
+										</div>
+										{#if statusData.redis.latency_ms !== null}
+											<span class="text-2xl font-bold font-mono text-white leading-none">{statusData.redis.latency_ms}</span>
+											<span class="text-xs text-text-muted font-mono mb-0.5">ms</span>
+										{:else}
+											<span class="text-2xl font-bold font-mono text-text-muted leading-none">—</span>
+										{/if}
+									</div>
+									<div class="mt-4 pt-4 border-t border-border-dim/50 flex items-center gap-1.5 text-[9px] font-mono text-text-muted uppercase tracking-wider">
+										{#if statusData.redis.status === 'connected'}
+											<Wifi size={10} class="text-cyan-400" />
+											<span>PING response confirmed</span>
+										{:else if statusData.redis.status === 'disabled'}
+											<WifiOff size={10} />
+											<span>Set REDIS_URL env var to enable</span>
+										{:else}
+											<WifiOff size={10} class="text-red-400" />
+											<span>Redis unreachable</span>
+										{/if}
+									</div>
+								</div>
+							</div>
+
 						</div>
 					{/if}
 				</div>
