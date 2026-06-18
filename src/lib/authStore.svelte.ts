@@ -23,6 +23,15 @@ class AuthStore {
 		this.#initialized = true;
 	}
 
+	redirectToLogin() {
+		if (typeof window === 'undefined') return;
+		const redirect = window.location.pathname + window.location.search;
+		const loginUrl = redirect && redirect !== '/login'
+			? `/login?redirect=${encodeURIComponent(redirect)}`
+			: '/login';
+		window.location.href = loginUrl;
+	}
+
 	async login(emailOrUsername: string, password: string) {
 		try {
 			const res = await fetch('/api/auth/login', {
@@ -93,11 +102,19 @@ class AuthStore {
 		}
 	}
 
-	// fetchWithAuth acts as a standard fetch since the browser handles auth cookies automatically.
-	// We keep this method for compatibility.
+	// fetchWithAuth automatically redirects to /login on 401 (expired/invalid token)
 	async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-		return fetch(url, options);
+		const res = await fetch(url, options);
+
+		if (res.status === 401 && typeof window !== 'undefined') {
+			// Token is expired or invalid — clear user state and redirect
+			this.#currentUser = null;
+			this.redirectToLogin();
+		}
+
+		return res;
 	}
 }
 
 export const auth = new AuthStore();
+

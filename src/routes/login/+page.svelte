@@ -7,6 +7,9 @@
 	import Button from '$lib/components/Button.svelte';
 	import { Eye, EyeOff, Lock, Mail, ArrowRight, Check } from '@lucide/svelte';
 
+	let { data } = $props();
+	const redirectTo: string = data?.redirectTo || '/';
+
 	let emailOrUsername = $state('');
 	let password = $state('');
 	let showPassword = $state(false);
@@ -48,7 +51,7 @@
 			triggerToast('Welcome back! Logging you in...');
 			setTimeout(async () => {
 				await invalidateAll();
-				goto('/');
+				goto(redirectTo);
 			}, 1000);
 		} else {
 			errorMsg = res.message;

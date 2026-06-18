@@ -8,7 +8,15 @@
 	let { data, children } = $props();
 
 	$effect(() => {
+		const wasLoggedIn = auth.initialized && auth.currentUser !== null;
 		auth.setUser(data.user);
+
+		// If SSR detected the session is gone (both tokens expired/invalid),
+		// data.user will be null. If the user was previously logged in,
+		// redirect to /login with the current path so they can come back.
+		if (wasLoggedIn && data.user === null && typeof window !== 'undefined') {
+			auth.redirectToLogin();
+		}
 	});
 </script>
 
