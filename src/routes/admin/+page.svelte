@@ -444,7 +444,7 @@
 						</div>
 					{/if}
 				</div>
-			{:else}
+			{:else if activeTab === 'pastes'}
 				<!-- Pastes Controls -->
 				<div class="mb-6">
 					<form onsubmit={handlePasteSearchSubmit} class="w-full sm:max-w-md relative">
