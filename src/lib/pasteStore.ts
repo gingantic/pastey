@@ -64,6 +64,7 @@ export async function savePaste(pasteData: {
 	lang: string;
 	expiry: string;
 	visibility: 'public' | 'unlisted' | 'private';
+	custom_slug?: string;
 }): Promise<Paste> {
 	const res = await auth.fetchWithAuth('/api/pastes', {
 		method: 'POST',

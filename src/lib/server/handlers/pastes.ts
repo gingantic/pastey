@@ -11,6 +11,23 @@ function generatePasteId(length = 4): string {
 	return id;
 }
 
+// Route segments that must never be used as paste slugs.
+const RESERVED_SLUGS = new Set([
+	'api', 'login', 'signup', 'logout', 'admin', 'raw', 'u',
+	'status', 'auth', 'users', 'pastes', 'ui-kit'
+]);
+
+// Validate a user-supplied custom slug.
+function validateCustomSlug(slug: string): string | null {
+	if (!/^[a-zA-Z0-9_-]{3,50}$/.test(slug)) {
+		return 'Custom URL must be 3–50 characters and contain only letters, numbers, hyphens, or underscores.';
+	}
+	if (RESERVED_SLUGS.has(slug.toLowerCase())) {
+		return `"${slug}" is a reserved name and cannot be used as a custom URL.`;
+	}
+	return null;
+}
+
 function validVisibility(v: string): string {
 	switch (v) {
 		case 'public':
@@ -73,7 +90,7 @@ export async function listPastes(url: URL) {
 }
 
 export async function createPaste(body: any, currentUser: any) {
-	const { title, content, lang, expiry, visibility } = body || {};
+	const { title, content, lang, expiry, visibility, custom_slug } = body || {};
 
 	if (!content || content.trim() === '') {
 		return { status: 400, error: 'content cannot be empty' };
@@ -81,15 +98,33 @@ export async function createPaste(body: any, currentUser: any) {
 
 	const db = await getDB();
 
-	let idLength = 4;
 	let uniqueId = '';
-	while (true) {
-		uniqueId = generatePasteId(idLength);
-		const existing = await db.getPasteById(uniqueId);
-		if (!existing) {
-			break;
+
+	// Custom slug path — only available to authenticated users
+	if (custom_slug && custom_slug.trim() !== '') {
+		if (!currentUser) {
+			return { status: 403, error: 'you must be logged in to use a custom URL' };
 		}
-		idLength++;
+		const slugError = validateCustomSlug(custom_slug.trim());
+		if (slugError) {
+			return { status: 400, error: slugError };
+		}
+		const existing = await db.getPasteById(custom_slug.trim());
+		if (existing) {
+			return { status: 409, error: 'that custom URL is already taken, please choose another' };
+		}
+		uniqueId = custom_slug.trim();
+	} else {
+		// Auto-generate a random short ID
+		let idLength = 4;
+		while (true) {
+			uniqueId = generatePasteId(idLength);
+			const existing = await db.getPasteById(uniqueId);
+			if (!existing) {
+				break;
+			}
+			idLength++;
+		}
 	}
 
 	const paste = {

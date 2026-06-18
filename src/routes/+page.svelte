@@ -86,6 +86,7 @@
 		lang: string;
 		expiry: string;
 		visibility: 'public' | 'unlisted' | 'private';
+		custom_slug?: string;
 	}) {
 		try {
 			if (editId) {

@@ -19,7 +19,7 @@ export const refresh_tokens = pgTable('refresh_tokens', {
 });
 
 export const pastes = pgTable('pastes', {
-	id: varchar('id', { length: 12 }).primaryKey().notNull(),
+	id: varchar('id', { length: 50 }).primaryKey().notNull(),
 	title: varchar('title', { length: 255 }).default('Untitled').notNull(),
 	content: text('content').notNull(),
 	lang: varchar('lang', { length: 50 }).default('plaintext').notNull(),

@@ -2,7 +2,8 @@
 	import Button from '$lib/components/Button.svelte';
 	import CodeEditor from '$lib/components/pastey/CodeEditor.svelte';
 	import Dropdown from '$lib/components/pastey/Dropdown.svelte';
-	import { ArrowRight, Globe, Link, Lock } from '@lucide/svelte';
+	import { auth } from '$lib/authStore.svelte';
+	import { ArrowRight, Globe, Link, Link2, Lock } from '@lucide/svelte';
 
 	interface RecentPaste {
 		id: string;
@@ -21,6 +22,7 @@
 			lang: string;
 			expiry: string;
 			visibility: 'public' | 'unlisted' | 'private';
+			custom_slug?: string;
 		}) => void;
 		onSelectRecentPaste: (paste: RecentPaste) => void;
 		toast: (msg: string) => void;
@@ -41,10 +43,31 @@
 	let selectedLang = $state('plaintext');
 	let selectedExpiry = $state('never');
 	let selectedVisibility = $state<'public' | 'unlisted' | 'private'>('public');
+	let customSlug = $state('');
 
 	let langDropdownOpen = $state(false);
 	let expiryDropdownOpen = $state(false);
 	let visibilityDropdownOpen = $state(false);
+
+	// Live validation for the slug input
+	const slugError = $derived(() => {
+		if (!customSlug.trim()) return null;
+		if (!/^[a-zA-Z0-9_-]{3,50}$/.test(customSlug.trim())) {
+			return '3–50 chars, letters/numbers/hyphens/underscores only';
+		}
+		const reserved = new Set(['api','login','signup','logout','admin','raw','u','status','auth','users','pastes','ui-kit']);
+		if (reserved.has(customSlug.trim().toLowerCase())) {
+			return `"${customSlug.trim()}" is reserved`;
+		}
+		return null;
+	});
+
+	const slugPreviewUrl = $derived(() => {
+		if (typeof window === 'undefined') return '';
+		const origin = window.location.origin;
+		const slug = customSlug.trim();
+		return slug ? `${origin}/${slug}` : '';
+	});
 
 	const languages = [
 		'plaintext',
@@ -83,18 +106,24 @@
 			toast('Paste content cannot be empty.');
 			return;
 		}
+		if (customSlug.trim() && slugError()) {
+			toast('Please fix the custom URL before saving.');
+			return;
+		}
 		onCreatePaste({
 			title: pasteTitle || 'untitled paste',
 			content: pasteContent,
 			lang: selectedLang,
 			expiry: selectedExpiry,
-			visibility: selectedVisibility
+			visibility: selectedVisibility,
+			...(customSlug.trim() ? { custom_slug: customSlug.trim() } : {})
 		});
 	}
 
 	function handleClear() {
 		pasteContent = '';
 		pasteTitle = '';
+		customSlug = '';
 	}
 
 	$effect(() => {
@@ -104,6 +133,7 @@
 			selectedLang = editPaste.lang;
 			selectedExpiry = editPaste.expiry;
 			selectedVisibility = editPaste.visibility;
+			customSlug = ''; // don't pre-fill slug on edit — ID is immutable
 		}
 	});
 </script>
@@ -230,6 +260,52 @@
 					expiryDropdownOpen = false;
 				}}
 			/>
+
+			<!-- Custom URL (logged-in users only, not shown when editing) -->
+			{#if auth.currentUser && !editPaste}
+				<div class="bg-brand-surface border border-border-dim rounded-3xl p-5 space-y-3">
+					<div class="flex items-center gap-2 font-mono text-[10px] text-text-muted uppercase tracking-widest">
+						<Link2 size={11} />
+						<span>// Custom URL <span class="text-text-muted/50 normal-case tracking-normal ml-1">(optional)</span></span>
+					</div>
+					<div class="relative">
+						<input
+							id="pastey-custom-slug"
+							type="text"
+							bind:value={customSlug}
+							placeholder="my-snippet"
+							maxlength="50"
+							class="w-full bg-brand-bg border text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 text-sm font-mono transition-all duration-300 outline-none focus:ring-1 focus:ring-white/10
+								{customSlug.trim() && slugError()
+									? 'border-red-500/50 focus:border-red-500'
+									: customSlug.trim() && !slugError()
+										? 'border-emerald-500/50 focus:border-emerald-400'
+										: 'border-border-dim focus:border-white'}"
+						/>
+					</div>
+
+					{#if customSlug.trim() && slugError()}
+						<p class="text-[10px] font-mono text-red-400 flex items-center gap-1.5">
+							<span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+							{slugError()}
+						</p>
+					{:else if customSlug.trim() && !slugError()}
+						<div class="space-y-1">
+							<p class="text-[10px] font-mono text-emerald-400 flex items-center gap-1.5">
+								<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+								Looks good!
+							</p>
+							<p class="text-[10px] font-mono text-text-muted truncate" title={slugPreviewUrl()}>
+								{slugPreviewUrl()}
+							</p>
+						</div>
+					{:else}
+						<p class="text-[10px] font-mono text-text-muted">
+							Leave blank for a random short URL.
+						</p>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Quick info card -->
 			<div
