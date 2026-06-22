@@ -19,12 +19,14 @@
 		value: string;
 		lang: string;
 		placeholder?: string;
+		disabled?: boolean;
 	}
 
 	let {
 		value = $bindable(''),
 		lang = 'plaintext',
-		placeholder = '// Paste your code here...'
+		placeholder = '// Paste your code here...',
+		disabled = false
 	}: Props = $props();
 
 	let editorScrollTop = $state(0);
@@ -81,7 +83,8 @@
 			onscroll={syncEditorScroll}
 			{placeholder}
 			spellcheck={false}
-			class="absolute inset-0 w-full h-full bg-transparent px-4 py-4 font-mono text-sm leading-6 resize-none outline-none overflow-auto code-editor-textarea text-transparent caret-white"
+			{disabled}
+			class="absolute inset-0 w-full h-full bg-transparent px-4 py-4 font-mono text-sm leading-6 resize-none outline-none overflow-auto code-editor-textarea text-transparent caret-white disabled:cursor-not-allowed"
 		></textarea>
 	</div>
 </div>

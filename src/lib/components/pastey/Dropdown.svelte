@@ -15,6 +15,7 @@
 		open: boolean;
 		onSelect?: (val: string) => void;
 		class?: string;
+		disabled?: boolean;
 	}
 
 	let {
@@ -23,7 +24,8 @@
 		options = [],
 		open = $bindable(false),
 		onSelect,
-		class: customClass = ''
+		class: customClass = '',
+		disabled = false
 	}: Props = $props();
 
 	// Standardize options to always be Option objects
@@ -43,7 +45,8 @@
 <div class="relative {customClass}">
 	<button
 		type="button"
-		class="w-full flex items-center justify-between gap-3 bg-brand-surface border border-border-dim rounded-2xl px-5 py-4 font-mono text-xs text-text-primary hover:border-border-light transition-colors"
+		class="w-full flex items-center justify-between gap-3 bg-brand-surface border border-border-dim rounded-2xl px-5 py-4 font-mono text-xs text-text-primary hover:border-border-light transition-colors disabled:opacity-50 disabled:pointer-events-none"
+		{disabled}
 		onclick={() => open = !open}
 	>
 		<div class="flex items-center gap-3">

@@ -13,6 +13,7 @@
 	let showToast = $state(false);
 	let toastMsg = $state('');
 	let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+	let isSubmitting = $state(false);
 
 	async function loadRecentPastes() {
 		try {
@@ -88,6 +89,7 @@
 		visibility: 'public' | 'unlisted' | 'private';
 		custom_slug?: string;
 	}) {
+		isSubmitting = true;
 		try {
 			if (editId) {
 				await updatePaste(editId, data);
@@ -104,6 +106,7 @@
 			}
 		} catch (err: any) {
 			toast(err.message || 'Failed to save paste.');
+			isSubmitting = false;
 		}
 	}
 
@@ -168,6 +171,7 @@
 				onSelectRecentPaste={handleSelectRecentPaste}
 				{toast}
 				{editPaste}
+				{isSubmitting}
 			/>
 		</main>
 

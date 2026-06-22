@@ -45,7 +45,6 @@
 		isSubmitting = true;
 
 		const res = await auth.login(emailOrUsername, password);
-		isSubmitting = false;
 
 		if (res.success) {
 			triggerToast('Welcome back! Logging you in...');
@@ -54,6 +53,7 @@
 				goto(redirectTo);
 			}, 1000);
 		} else {
+			isSubmitting = false;
 			errorMsg = res.message;
 		}
 	}

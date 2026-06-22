@@ -27,6 +27,7 @@
 		onSelectRecentPaste: (paste: RecentPaste) => void;
 		toast: (msg: string) => void;
 		editPaste?: any;
+		isSubmitting?: boolean;
 	}
 
 	let {
@@ -34,7 +35,8 @@
 		onCreatePaste,
 		onSelectRecentPaste,
 		toast,
-		editPaste
+		editPaste,
+		isSubmitting = false
 	}: Props = $props();
 
 	// ─── State ───────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@
 	const slugError = $derived(() => {
 		if (!customSlug.trim()) return null;
 		if (!/^[a-zA-Z0-9_-]{3,50}$/.test(customSlug.trim())) {
-			return '3–50 chars, letters/numbers/hyphens/underscores only';
+			return '3-50 chars, letters/numbers/hyphens/underscores only';
 		}
 		const reserved = new Set(['api','login','signup','logout','admin','raw','u','status','auth','users','pastes','ui-kit']);
 		if (reserved.has(customSlug.trim().toLowerCase())) {
@@ -155,7 +157,8 @@
 					type="text"
 					bind:value={pasteTitle}
 					placeholder="untitled paste..."
-					class="w-full bg-brand-bg border border-border-dim text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 text-sm font-mono transition-all duration-300 outline-none focus:border-white focus:ring-1 focus:ring-white/10"
+					disabled={isSubmitting}
+					class="w-full bg-brand-bg border border-border-dim text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 text-sm font-mono transition-all duration-300 outline-none focus:border-white focus:ring-1 focus:ring-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
 				/>
 			</div>
 
@@ -178,7 +181,8 @@
 					</div>
 					<button
 						id="pastey-clear-btn"
-						class="font-mono text-[10px] text-text-muted hover:text-white transition-colors"
+						class="font-mono text-[10px] text-text-muted hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none"
+						disabled={isSubmitting}
 						onclick={handleClear}
 					>
 						clear
@@ -186,7 +190,7 @@
 				</div>
 
 				<!-- Live Highlighting CodeEditor component -->
-				<CodeEditor bind:value={pasteContent} lang={selectedLang} />
+				<CodeEditor bind:value={pasteContent} lang={selectedLang} disabled={isSubmitting} />
 			</div>
 
 			<!-- Create button row -->
@@ -208,6 +212,7 @@
 						id="pastey-cancel-btn"
 						variant="secondary"
 						onclick={handleClear}
+						disabled={isSubmitting}
 					>
 						Clear
 					</Button>
@@ -215,8 +220,13 @@
 						id="pastey-create-btn"
 						variant="primary"
 						onclick={handleCreate}
+						disabled={isSubmitting}
 					>
-						{editPaste ? 'Update Paste →' : 'Create Paste →'}
+						{#if isSubmitting}
+							{editPaste ? 'Updating...' : 'Creating...'}
+						{:else}
+							{editPaste ? 'Update Paste →' : 'Create Paste →'}
+						{/if}
 					</Button>
 				</div>
 			</div>
@@ -231,6 +241,7 @@
 				options={languages}
 				bind:value={selectedLang}
 				bind:open={langDropdownOpen}
+				disabled={isSubmitting}
 				onSelect={() => {
 					expiryDropdownOpen = false;
 					visibilityDropdownOpen = false;
@@ -243,6 +254,7 @@
 				options={expiryOptions}
 				bind:value={selectedExpiry}
 				bind:open={expiryDropdownOpen}
+				disabled={isSubmitting}
 				onSelect={() => {
 					langDropdownOpen = false;
 					visibilityDropdownOpen = false;
@@ -255,6 +267,7 @@
 				options={visibilityOptions}
 				bind:value={selectedVisibility}
 				bind:open={visibilityDropdownOpen}
+				disabled={isSubmitting}
 				onSelect={() => {
 					langDropdownOpen = false;
 					expiryDropdownOpen = false;
@@ -275,7 +288,8 @@
 							bind:value={customSlug}
 							placeholder="my-snippet"
 							maxlength="50"
-							class="w-full bg-brand-bg border text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 text-sm font-mono transition-all duration-300 outline-none focus:ring-1 focus:ring-white/10
+							disabled={isSubmitting}
+							class="w-full bg-brand-bg border text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 text-sm font-mono transition-all duration-300 outline-none focus:ring-1 focus:ring-white/10 disabled:opacity-50 disabled:cursor-not-allowed
 								{customSlug.trim() && slugError()
 									? 'border-red-500/50 focus:border-red-500'
 									: customSlug.trim() && !slugError()

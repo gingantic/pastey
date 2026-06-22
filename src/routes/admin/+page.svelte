@@ -23,6 +23,7 @@
 		Zap
 	} from '@lucide/svelte';
 	import { untrack } from 'svelte';
+	import { auth } from '$lib/authStore.svelte';
 
 	// ─── Tabs & Loading ───────────────────────────────────────────────────────
 	let activeTab = $state<'users' | 'pastes' | 'status'>('users');
@@ -52,7 +53,7 @@
 		statusRefreshing = true;
 		statusError = '';
 		try {
-			const res = await fetch('/api/admin/status');
+			const res = await auth.fetchWithAuth('/api/admin/status');
 			if (res.ok) {
 				statusData = await res.json();
 			} else {
@@ -95,7 +96,7 @@
 		isLoading = true;
 		try {
 			const offset = (userPage - 1) * userLimit;
-			const res = await fetch(`/api/admin/users?limit=${userLimit}&offset=${offset}&search=${encodeURIComponent(userSearch)}`);
+			const res = await auth.fetchWithAuth(`/api/admin/users?limit=${userLimit}&offset=${offset}&search=${encodeURIComponent(userSearch)}`);
 			if (res.ok) {
 				const data = await res.json();
 				usersList = data.users || [];
@@ -115,7 +116,7 @@
 		isLoading = true;
 		try {
 			const offset = (pastePage - 1) * pasteLimit;
-			const res = await fetch(`/api/admin/pastes?limit=${pasteLimit}&offset=${offset}&search=${encodeURIComponent(pasteSearch)}`);
+			const res = await auth.fetchWithAuth(`/api/admin/pastes?limit=${pasteLimit}&offset=${offset}&search=${encodeURIComponent(pasteSearch)}`);
 			if (res.ok) {
 				const data = await res.json();
 				pastesList = data.pastes || [];
@@ -147,7 +148,7 @@
 	// ─── Admin Controller Actions ─────────────────────────────────────────────
 	async function handleToggleAdmin(userId: string) {
 		try {
-			const res = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
+			const res = await auth.fetchWithAuth(`/api/admin/users/${userId}/toggle-admin`, {
 				method: 'POST'
 			});
 			if (res.ok) {
@@ -167,7 +168,7 @@
 			return;
 		}
 		try {
-			const res = await fetch(`/api/admin/users/${userId}`, {
+			const res = await auth.fetchWithAuth(`/api/admin/users/${userId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {
@@ -191,7 +192,7 @@
 			return;
 		}
 		try {
-			const res = await fetch(`/api/pastes/${pasteId}`, {
+			const res = await auth.fetchWithAuth(`/api/pastes/${pasteId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {

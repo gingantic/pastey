@@ -66,7 +66,6 @@
 		isSubmitting = true;
 
 		const res = await auth.signup(username.trim(), email.trim(), password);
-		isSubmitting = false;
 
 		if (res.success) {
 			triggerToast('Account created successfully! Logging you in...');
@@ -75,6 +74,7 @@
 				goto('/');
 			}, 1000);
 		} else {
+			isSubmitting = false;
 			errorMsg = res.message;
 		}
 	}

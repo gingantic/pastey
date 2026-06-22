@@ -34,7 +34,7 @@ class AuthStore {
 
 	async login(emailOrUsername: string, password: string) {
 		try {
-			const res = await fetch('/api/auth/login', {
+			const res = await fetchWithTimeout('/api/auth/login', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -59,7 +59,7 @@ class AuthStore {
 
 	async signup(username: string, email: string, password: string) {
 		try {
-			const res = await fetch('/api/auth/signup', {
+			const res = await fetchWithTimeout('/api/auth/signup', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -84,7 +84,7 @@ class AuthStore {
 
 	async logout() {
 		try {
-			await fetch('/api/auth/logout', {
+			await fetchWithTimeout('/api/auth/logout', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -104,7 +104,7 @@ class AuthStore {
 
 	// fetchWithAuth automatically redirects to /login on 401 (expired/invalid token)
 	async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-		const res = await fetch(url, options);
+		const res = await fetchWithTimeout(url, options);
 
 		if (res.status === 401 && typeof window !== 'undefined') {
 			// Token is expired or invalid — clear user state and redirect
@@ -113,6 +113,25 @@ class AuthStore {
 		}
 
 		return res;
+	}
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 60000): Promise<Response> {
+	const controller = new AbortController();
+	const id = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		const response = await fetch(url, {
+			...options,
+			signal: controller.signal
+		});
+		clearTimeout(id);
+		return response;
+	} catch (error: any) {
+		clearTimeout(id);
+		if (error.name === 'AbortError') {
+			throw new Error('Request timed out (60 seconds)');
+		}
+		throw error;
 	}
 }
 
