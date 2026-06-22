@@ -4,19 +4,23 @@
 	import { auth } from '$lib/authStore.svelte';
 	import { navigating } from '$app/stores';
 	import LoadingBar from '$lib/components/LoadingBar.svelte';
+	import { untrack } from 'svelte';
 
 	let { data, children } = $props();
 
 	$effect(() => {
-		const wasLoggedIn = auth.initialized && auth.currentUser !== null;
-		auth.setUser(data.user);
+		const user = data.user;
+		untrack(() => {
+			const wasLoggedIn = auth.initialized && auth.currentUser !== null;
+			auth.setUser(user);
 
-		// If SSR detected the session is gone (both tokens expired/invalid),
-		// data.user will be null. If the user was previously logged in,
-		// redirect to /login with the current path so they can come back.
-		if (wasLoggedIn && data.user === null && typeof window !== 'undefined') {
-			auth.redirectToLogin();
-		}
+			// If SSR detected the session is gone (both tokens expired/invalid),
+			// data.user will be null. If the user was previously logged in,
+			// redirect to /login with the current path so they can come back.
+			if (wasLoggedIn && user === null && typeof window !== 'undefined') {
+				auth.redirectToLogin();
+			}
+		});
 	});
 </script>
 

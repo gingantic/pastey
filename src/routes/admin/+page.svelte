@@ -22,6 +22,7 @@
 		WifiOff,
 		Zap
 	} from '@lucide/svelte';
+	import { untrack } from 'svelte';
 
 	// ─── Tabs & Loading ───────────────────────────────────────────────────────
 	let activeTab = $state<'users' | 'pastes' | 'status'>('users');
@@ -133,26 +134,13 @@
 	// Load users and pastes initially and reactive page triggers
 	$effect(() => {
 		if (activeTab === 'users') {
-			loadUsers();
+			const _ = userPage; // Track page changes
+			untrack(() => loadUsers()); // Do not track search inputs or internal state updates
 		} else if (activeTab === 'pastes') {
-			loadPastes();
+			const _ = pastePage; // Track page changes
+			untrack(() => loadPastes());
 		} else if (activeTab === 'status') {
-			loadStatus();
-		}
-	});
-
-	// Trigger reload on page changes
-	$effect(() => {
-		const _ = userPage;
-		if (activeTab === 'users') {
-			loadUsers();
-		}
-	});
-
-	$effect(() => {
-		const _ = pastePage;
-		if (activeTab === 'pastes') {
-			loadPastes();
+			untrack(() => loadStatus());
 		}
 	});
 
