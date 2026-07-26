@@ -43,21 +43,6 @@ export function mapBackendPaste(p: any): Paste {
 	};
 }
 
-export async function getPastes(): Promise<Paste[]> {
-	try {
-		const res = await auth.fetchWithAuth('/api/pastes');
-		if (!res.ok) {
-			throw new Error(`Failed to fetch recent pastes: HTTP ${res.status}`);
-		}
-		const data = await res.json();
-		const pastes = data.pastes || [];
-		return pastes.map(mapBackendPaste);
-	} catch (e) {
-		console.error(e);
-		return [];
-	}
-}
-
 export async function savePaste(pasteData: {
 	title: string;
 	content: string;

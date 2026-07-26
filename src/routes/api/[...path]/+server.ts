@@ -2,7 +2,6 @@ import { dev } from '$app/environment';
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { verifyAccessToken } from '$lib/server/auth';
-import * as statusHandler from '$lib/server/handlers/status';
 import * as authHandler from '$lib/server/handlers/auth';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import * as adminHandler from '$lib/server/handlers/admin';
@@ -52,13 +51,8 @@ async function handleRouter(event: any) {
 	};
 
 	try {
-		// 1. Status Route
-		if (path === 'status') {
-			res = { status: 200, data: await statusHandler.getStatus() };
-		}
-		
-		// 2. Auth Routes
-		else if (parts[0] === 'auth') {
+		// 1. Auth Routes
+		if (parts[0] === 'auth') {
 			if (parts[1] === 'signup' && method === 'POST') {
 				res = await authHandler.signup(body);
 			} else if (parts[1] === 'login' && method === 'POST') {
@@ -75,21 +69,19 @@ async function handleRouter(event: any) {
 			}
 		}
 		
-		// 3. User Routes
+		// 2. User Routes
 		else if (parts[0] === 'users') {
-			if (parts[1] === 'me' && parts[2] === 'pastes' && method === 'GET') {
+			if (parts[1] === 'me' && parts.length === 2 && method === 'GET') {
 				res = await pastesHandler.myPastes(user);
-			} else if (parts[2] === 'pastes' && method === 'GET') {
+			} else if (parts.length === 2 && method === 'GET') {
 				res = await pastesHandler.personalPastes(parts[1], user);
 			}
 		}
 		
-		// 4. Pastes Routes
+		// 3. Pastes Routes
 		else if (parts[0] === 'pastes') {
 			if (parts.length === 1) {
-				if (method === 'GET') {
-					res = await pastesHandler.listPastes(url);
-				} else if (method === 'POST') {
+				if (method === 'POST') {
 					res = await pastesHandler.createPaste(body, user);
 				}
 			} else if (parts.length === 2) {
@@ -106,7 +98,7 @@ async function handleRouter(event: any) {
 			}
 		}
 		
-		// 5. Admin Routes
+		// 4. Admin Routes
 		else if (parts[0] === 'admin') {
 			if (parts[1] === 'users') {
 				if (parts.length === 2 && method === 'GET') {
@@ -118,8 +110,6 @@ async function handleRouter(event: any) {
 				}
 			} else if (parts[1] === 'pastes' && method === 'GET') {
 				res = await adminHandler.listPastes(url, user);
-			} else if (parts[1] === 'status' && method === 'GET') {
-				res = await statusHandler.getDetailedStatus(user);
 			}
 		}
 		

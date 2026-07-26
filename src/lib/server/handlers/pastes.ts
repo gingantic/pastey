@@ -70,25 +70,6 @@ function getExpiresAt(expiry: string): Date | null {
 	return new Date(Date.now() + ms);
 }
 
-export async function listPastes(url: URL) {
-	const limitVal = url.searchParams.get('limit');
-	const offsetVal = url.searchParams.get('offset');
-
-	let limit = parseInt(limitVal || '', 10);
-	if (isNaN(limit) || limit <= 0 || limit > 50) {
-		limit = 20;
-	}
-
-	let offset = parseInt(offsetVal || '', 10);
-	if (isNaN(offset) || offset < 0) {
-		offset = 0;
-	}
-
-	const db = await getDB();
-	const result = await db.listPublicPastes(limit, offset);
-	return { status: 200, data: result };
-}
-
 export async function createPaste(body: any, currentUser: any) {
 	const { title, content, lang, expiry, visibility, custom_slug } = body || {};
 

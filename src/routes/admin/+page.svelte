@@ -23,7 +23,11 @@
 		Zap
 	} from '@lucide/svelte';
 	import { untrack } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { auth } from '$lib/authStore.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	// ─── Tabs & Loading ───────────────────────────────────────────────────────
 	let activeTab = $state<'users' | 'pastes' | 'status'>('users');
@@ -37,33 +41,15 @@
 	let usersList = $state<any[]>([]);
 
 	// ─── Status Tab State ────────────────────────────────────────────────────
-	type ServiceStatus = 'connected' | 'disabled' | 'error';
-	interface StatusData {
-		timestamp: string;
-		database: { status: 'connected' | 'error'; type: string; latency_ms: number | null };
-		redis: { status: ServiceStatus; latency_ms: number | null };
-	}
-	let statusData = $state<StatusData | null>(null);
-	let statusLoading = $state(false);
-	let statusError = $state('');
+	// Status data is loaded server-side (see +page.server.ts) instead of via an API
+	let statusData = $derived(data.status);
 	let statusRefreshing = $state(false);
 
-	async function loadStatus(silent = false) {
-		if (!silent) statusLoading = true;
+	async function refreshStatus() {
 		statusRefreshing = true;
-		statusError = '';
 		try {
-			const res = await auth.fetchWithAuth('/api/admin/status');
-			if (res.ok) {
-				statusData = await res.json();
-			} else {
-				const err = await res.json().catch(() => ({}));
-				statusError = err.error || 'Failed to load status';
-			}
-		} catch (e: any) {
-			statusError = e.message || 'Connection error';
+			await invalidateAll();
 		} finally {
-			statusLoading = false;
 			statusRefreshing = false;
 		}
 	}
@@ -140,8 +126,6 @@
 		} else if (activeTab === 'pastes') {
 			const _ = pastePage; // Track page changes
 			untrack(() => loadPastes());
-		} else if (activeTab === 'status') {
-			untrack(() => loadStatus());
 		}
 	});
 
@@ -546,7 +530,7 @@
 					<!-- Refresh button -->
 					<div class="flex justify-end">
 						<button
-							onclick={() => loadStatus()}
+							onclick={() => refreshStatus()}
 							disabled={statusRefreshing}
 							class="flex items-center gap-2 px-4 py-2 bg-brand-surface/60 border border-border-dim rounded-xl font-mono text-[10px] text-text-muted hover:text-white hover:border-border-light transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
 						>
@@ -555,23 +539,7 @@
 						</button>
 					</div>
 
-					{#if statusLoading}
-						<!-- Skeleton loader -->
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-							{#each [1, 2] as _}
-								<div class="bg-brand-surface/40 border border-border-dim rounded-2xl p-6 animate-pulse">
-									<div class="h-4 bg-white/5 rounded w-1/3 mb-4"></div>
-									<div class="h-8 bg-white/5 rounded w-1/2 mb-3"></div>
-									<div class="h-3 bg-white/5 rounded w-2/3"></div>
-								</div>
-							{/each}
-						</div>
-					{:else if statusError}
-						<div class="flex items-center gap-3 bg-red-500/5 border border-red-500/20 rounded-2xl px-6 py-5 font-mono text-xs text-red-400">
-							<AlertTriangle size={15} />
-							<span>{statusError}</span>
-						</div>
-					{:else if statusData}
+					{#if statusData}
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
 							<!-- Database Card -->

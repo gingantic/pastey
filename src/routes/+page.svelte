@@ -3,50 +3,16 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { Check } from '@lucide/svelte';
-	import { getPastes, savePaste, getPasteById, updatePaste } from '$lib/pasteStore';
+	import { savePaste, getPasteById, updatePaste } from '$lib/pasteStore';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/authStore.svelte';
 	import { page } from '$app/stores';
 
 	// ─── State ───────────────────────────────────────────────────────────────
-	let recentPastes = $state<any[]>([]);
 	let showToast = $state(false);
 	let toastMsg = $state('');
 	let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 	let isSubmitting = $state(false);
-
-	async function loadRecentPastes() {
-		try {
-			const pastes = await getPastes();
-			recentPastes = pastes
-				.filter((p) => {
-					// Public pastes are visible to everyone
-					if (p.visibility === 'public') return true;
-					// Private pastes are visible only to their logged-in author
-					if (p.visibility === 'private') {
-						return auth.currentUser && p.author.toLowerCase() === auth.currentUser.username.toLowerCase();
-					}
-					// Unlisted pastes are hidden from recent pastes lists (accessible via link sharing only)
-					return false;
-				})
-				.map((p) => ({
-					id: p.id,
-					title: p.title,
-					lang: p.lang,
-					lines: p.content ? p.content.split('\n').length : 0,
-					date: p.date,
-					private: p.visibility === 'private'
-				}));
-		} catch (e) {
-			console.error('Failed to load recent pastes', e);
-		}
-	}
-
-	$effect(() => {
-		// Re-run when auth is checked or user status updates
-		const _user = auth.currentUser;
-		loadRecentPastes();
-	});
 
 	// ─── Helpers ─────────────────────────────────────────────────────────────
 	function toast(msg: string) {
@@ -109,10 +75,6 @@
 			isSubmitting = false;
 		}
 	}
-
-	function handleSelectRecentPaste(paste: { id: string }) {
-		goto(`/${paste.id}`);
-	}
 </script>
 
 <svelte:head>
@@ -166,9 +128,7 @@
 		<!-- Main content -->
 		<main class="w-full max-w-6xl px-6 mt-10 pb-24 min-w-0">
 			<PasteEditor
-				{recentPastes}
 				onCreatePaste={handleCreatePaste}
-				onSelectRecentPaste={handleSelectRecentPaste}
 				{toast}
 				{editPaste}
 				{isSubmitting}

@@ -3,19 +3,9 @@
 	import CodeEditor from '$lib/components/pastey/CodeEditor.svelte';
 	import Dropdown from '$lib/components/pastey/Dropdown.svelte';
 	import { auth } from '$lib/authStore.svelte';
-	import { ArrowRight, Globe, Link, Link2, Lock } from '@lucide/svelte';
-
-	interface RecentPaste {
-		id: string;
-		title: string;
-		lang: string;
-		lines: number;
-		date: string;
-		private: boolean;
-	}
+	import { Globe, Link, Link2, Lock } from '@lucide/svelte';
 
 	interface Props {
-		recentPastes: RecentPaste[];
 		onCreatePaste: (data: {
 			title: string;
 			content: string;
@@ -24,16 +14,13 @@
 			visibility: 'public' | 'unlisted' | 'private';
 			custom_slug?: string;
 		}) => void;
-		onSelectRecentPaste: (paste: RecentPaste) => void;
 		toast: (msg: string) => void;
 		editPaste?: any;
 		isSubmitting?: boolean;
 	}
 
 	let {
-		recentPastes = [],
 		onCreatePaste,
-		onSelectRecentPaste,
 		toast,
 		editPaste,
 		isSubmitting = false
@@ -341,53 +328,6 @@
 					<span>Hit <em class="text-white not-italic">Create Paste</em> — get a shareable link instantly.</span>
 				</div>
 			</div>
-		</div>
-	</div>
-
-	<!-- Recent Pastes -->
-	<div>
-		<h2 class="text-xl font-mono font-bold mb-6 text-white flex items-center gap-3">
-			Recent Pastes
-			<span class="text-[10px] font-normal text-text-muted border border-border-dim rounded-full px-3 py-1">
-				public
-			</span>
-		</h2>
-
-		<div class="bg-brand-surface border border-border-dim rounded-3xl overflow-hidden">
-			{#each recentPastes as paste, i}
-				<button
-					id="pastey-recent-{paste.id}"
-					class="w-full flex items-center justify-between px-6 py-4 font-mono text-xs text-left transition-colors hover:bg-brand-accent group
-						{i < recentPastes.length - 1 ? 'border-b border-border-dim' : ''}"
-					onclick={() => onSelectRecentPaste(paste)}
-				>
-					<div class="flex items-center gap-4 min-w-0">
-						<!-- Lang badge -->
-						<span
-							class="text-[10px] px-2 py-0.5 bg-brand-bg border border-border-dim rounded text-text-muted font-mono shrink-0"
-						>
-							{paste.lang}
-						</span>
-						<!-- Title -->
-						<span
-							class="text-text-primary group-hover:text-white truncate transition-colors"
-						>
-							{paste.title}
-						</span>
-						{#if paste.private}
-							<Lock size={10} class="text-text-muted shrink-0" />
-						{/if}
-					</div>
-					<div class="flex items-center gap-6 text-text-muted shrink-0 ml-4">
-						<span>{paste.lines} lines</span>
-						<span class="hidden sm:inline">{paste.date}</span>
-						<ArrowRight
-							size={12}
-							class="opacity-0 group-hover:opacity-100 transition-opacity -translate-x-1 group-hover:translate-x-0 duration-200"
-						/>
-					</div>
-				</button>
-			{/each}
 		</div>
 	</div>
 </div>

@@ -1,40 +1,13 @@
 import { getDB } from '../db';
 
-export async function getStatus() {
-	const db = await getDB();
-	const userCount = await db.countUsers().catch(() => 0);
-	
-	// We call listAllPastesAdmin with limit=1 to get the total pastes count efficiently
-	const pasteCount = await db.listAllPastesAdmin(1, 0).then(res => res.total).catch(() => 0);
-
-	let redisStatus = 'disabled';
-	try {
-		const { getRedisClient } = await import('../redis');
-		const redis = await getRedisClient();
-		if (redis) {
-			redisStatus = 'connected';
-		}
-	} catch (err) {
-		redisStatus = 'error';
-	}
-
-	return {
-		status: 'healthy',
-		message: 'Welcome to Pastey.',
-		timestamp: new Date().toISOString(),
-		redis: redisStatus,
-		stats: {
-			total_users: userCount,
-			total_pastes: pasteCount
-		}
-	};
+export interface SystemStatus {
+	timestamp: string;
+	database: { status: 'connected' | 'error'; type: string; latency_ms: number | null };
+	redis: { status: 'connected' | 'disabled' | 'error'; latency_ms: number | null };
 }
 
-export async function getDetailedStatus(currentUser: any) {
-	if (!currentUser || !currentUser.is_admin) {
-		return { status: 403, error: 'forbidden: admin access required' };
-	}
-
+// Called directly from server-side code (admin page load), not exposed via API
+export async function getSystemStatus(): Promise<SystemStatus> {
 	// ── Database health ───────────────────────────────────────────────────────
 	let dbStatus: 'connected' | 'error' = 'error';
 	let dbLatencyMs: number | null = null;
@@ -75,19 +48,15 @@ export async function getDetailedStatus(currentUser: any) {
 	}
 
 	return {
-		status: 200,
-		data: {
-			timestamp: new Date().toISOString(),
-			database: {
-				status: dbStatus,
-				type: dbType,
-				latency_ms: dbLatencyMs
-			},
-			redis: {
-				status: redisStatus,
-				latency_ms: redisLatencyMs
-			}
+		timestamp: new Date().toISOString(),
+		database: {
+			status: dbStatus,
+			type: dbType,
+			latency_ms: dbLatencyMs
+		},
+		redis: {
+			status: redisStatus,
+			latency_ms: redisLatencyMs
 		}
 	};
 }
-
