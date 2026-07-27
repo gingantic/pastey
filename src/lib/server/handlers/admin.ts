@@ -84,6 +84,9 @@ export async function deleteUser(id: string, currentUser: any) {
 	// Delete user's refresh tokens
 	await db.deleteRefreshTokensByUserId(id);
 
+	// Delete user's API keys
+	await db.deleteApiKeysByUserId(id);
+
 	// Delete user
 	await db.deleteUser(id);
 

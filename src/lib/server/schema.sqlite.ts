@@ -18,6 +18,16 @@ export const refresh_tokens = sqliteTable('refresh_tokens', {
 	created_at: text('created_at').notNull()
 });
 
+export const api_keys = sqliteTable('api_keys', {
+	id: text('id').primaryKey().notNull(),
+	user_id: text('user_id').notNull(),
+	name: text('name').notNull(),
+	key_hash: text('key_hash').unique().notNull(),
+	prefix: text('prefix').notNull(),
+	created_at: text('created_at').notNull(),
+	last_used_at: text('last_used_at')
+});
+
 export const pastes = sqliteTable('pastes', {
 	id: text('id').primaryKey().notNull(),
 	title: text('title').default('Untitled').notNull(),
@@ -35,4 +45,5 @@ export const pastes = sqliteTable('pastes', {
 
 export type SqliteUser = typeof users.$inferSelect;
 export type SqliteRefreshToken = typeof refresh_tokens.$inferSelect;
+export type SqliteApiKey = typeof api_keys.$inferSelect;
 export type SqlitePaste = typeof pastes.$inferSelect;

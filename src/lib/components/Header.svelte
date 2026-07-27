@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import { auth } from '$lib/authStore.svelte';
-	import { LogOut, Plus, ChevronDown, User, Shield } from '@lucide/svelte';
+	import { LogOut, Plus, ChevronDown, User, Shield, KeyRound } from '@lucide/svelte';
 
 	interface Props {
 		title?: string;
@@ -61,6 +61,12 @@
 
 		<!-- Nav Actions -->
 		<nav class="flex items-center gap-3 font-mono text-xs relative">
+			<a
+				href="/docs"
+				class="px-4 py-2 rounded-lg transition-colors border bg-brand-accent text-text-secondary border-border-dim hover:text-white"
+			>
+				Docs
+			</a>
 			{#if auth.currentUser}
 				<div class="relative">
 					<button
@@ -98,6 +104,14 @@
 							>
 								<User size={12} />
 								My Pastes
+							</a>
+							<a
+								href="/settings"
+								class="flex items-center gap-2 px-4 py-3 hover:bg-brand-accent text-text-secondary hover:text-white transition-colors border-t border-border-dim"
+								onclick={() => dropdownOpen = false}
+							>
+								<KeyRound size={12} />
+								API Keys
 							</a>
 							{#if auth.currentUser?.is_admin}
 								<a

@@ -96,6 +96,12 @@ describe('RedisAdapterWrapper', () => {
 			listPastesByAuthorId: vi.fn(),
 			listPastesByAuthorName: vi.fn(),
 			listAllPastesAdmin: vi.fn(),
+			createApiKey: vi.fn(),
+			getApiKeyByHash: vi.fn(),
+			listApiKeysByUserId: vi.fn().mockResolvedValue([]),
+			deleteApiKey: vi.fn(),
+			deleteApiKeysByUserId: vi.fn(),
+			touchApiKey: vi.fn(),
 		};
 		wrapper = new RedisAdapterWrapper(mockDB, mockRedis);
 	});

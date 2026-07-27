@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, or, and, like, sql, count, desc, isNull, gt } from 'drizzle-orm';
-import type { DBAdapter, User, RefreshToken, Paste, UserWithPasteCount } from './db';
+import type { DBAdapter, User, RefreshToken, ApiKey, Paste, UserWithPasteCount } from './db';
 import * as schema from './schema.sqlite';
 
 export class SqliteAdapter implements DBAdapter {
@@ -37,6 +37,16 @@ export class SqliteAdapter implements DBAdapter {
 				token TEXT UNIQUE NOT NULL,
 				expires_at TEXT NOT NULL,
 				created_at TEXT NOT NULL
+			);
+
+			CREATE TABLE IF NOT EXISTS api_keys (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				name TEXT NOT NULL,
+				key_hash TEXT UNIQUE NOT NULL,
+				prefix TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				last_used_at TEXT
 			);
 
 			CREATE TABLE IF NOT EXISTS pastes (
@@ -234,6 +244,67 @@ export class SqliteAdapter implements DBAdapter {
 
 	async deleteRefreshTokensByUserId(userId: string): Promise<void> {
 		await this.db.delete(schema.refresh_tokens).where(eq(schema.refresh_tokens.user_id, userId));
+	}
+
+	// ─── API Key Operations ───────────────────────────────────────────────────────
+
+	private mapApiKeyRow(row: schema.SqliteApiKey): ApiKey {
+		return {
+			id: row.id,
+			user_id: row.user_id,
+			name: row.name,
+			key_hash: row.key_hash,
+			prefix: row.prefix,
+			created_at: this.fromSqlDate(row.created_at)!,
+			last_used_at: this.fromSqlDate(row.last_used_at)
+		};
+	}
+
+	async createApiKey(key: ApiKey): Promise<void> {
+		await this.db.insert(schema.api_keys).values({
+			id: key.id,
+			user_id: key.user_id,
+			name: key.name,
+			key_hash: key.key_hash,
+			prefix: key.prefix,
+			created_at: this.toSqlDate(key.created_at)!,
+			last_used_at: this.toSqlDate(key.last_used_at)
+		});
+	}
+
+	async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+		const rows = await this.db
+			.select()
+			.from(schema.api_keys)
+			.where(eq(schema.api_keys.key_hash, keyHash));
+		if (rows.length === 0) return null;
+		return this.mapApiKeyRow(rows[0]);
+	}
+
+	async listApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+		const rows = await this.db
+			.select()
+			.from(schema.api_keys)
+			.where(eq(schema.api_keys.user_id, userId))
+			.orderBy(desc(schema.api_keys.created_at));
+		return rows.map((row) => this.mapApiKeyRow(row));
+	}
+
+	async deleteApiKey(id: string, userId: string): Promise<void> {
+		await this.db
+			.delete(schema.api_keys)
+			.where(and(eq(schema.api_keys.id, id), eq(schema.api_keys.user_id, userId)));
+	}
+
+	async deleteApiKeysByUserId(userId: string): Promise<void> {
+		await this.db.delete(schema.api_keys).where(eq(schema.api_keys.user_id, userId));
+	}
+
+	async touchApiKey(id: string, when: Date): Promise<void> {
+		await this.db
+			.update(schema.api_keys)
+			.set({ last_used_at: this.toSqlDate(when) })
+			.where(eq(schema.api_keys.id, id));
 	}
 
 	// ─── Paste Operations ──────────────────────────────────────────────────────

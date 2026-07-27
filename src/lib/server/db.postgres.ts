@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, or, and, like, sql, count, desc, isNull, gt } from 'drizzle-orm';
-import type { DBAdapter, User, RefreshToken, Paste, UserWithPasteCount } from './db';
+import type { DBAdapter, User, RefreshToken, ApiKey, Paste, UserWithPasteCount } from './db';
 import * as schema from './schema.postgres';
 
 const { Pool } = pg;
@@ -23,6 +23,19 @@ export class PostgresAdapter implements DBAdapter {
 	async init(): Promise<void> {
 		// Initialize Drizzle ORM
 		this.db = drizzle(this.pool, { schema });
+
+		// Ensure the api_keys table exists (added after initial deployments)
+		await this.pool.query(`
+			CREATE TABLE IF NOT EXISTS api_keys (
+				id UUID PRIMARY KEY,
+				user_id UUID NOT NULL,
+				name VARCHAR(50) NOT NULL,
+				key_hash VARCHAR(255) UNIQUE NOT NULL,
+				prefix VARCHAR(20) NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL,
+				last_used_at TIMESTAMPTZ
+			);
+		`);
 	}
 
 	// ─── User Operations ───────────────────────────────────────────────────────
@@ -155,6 +168,54 @@ export class PostgresAdapter implements DBAdapter {
 
 	async deleteRefreshTokensByUserId(userId: string): Promise<void> {
 		await this.db.delete(schema.refresh_tokens).where(eq(schema.refresh_tokens.user_id, userId));
+	}
+
+	// ─── API Key Operations ───────────────────────────────────────────────────────
+
+	async createApiKey(key: ApiKey): Promise<void> {
+		await this.db.insert(schema.api_keys).values({
+			id: key.id,
+			user_id: key.user_id,
+			name: key.name,
+			key_hash: key.key_hash,
+			prefix: key.prefix,
+			created_at: key.created_at,
+			last_used_at: key.last_used_at
+		});
+	}
+
+	async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+		const rows = await this.db
+			.select()
+			.from(schema.api_keys)
+			.where(eq(schema.api_keys.key_hash, keyHash));
+		if (rows.length === 0) return null;
+		return rows[0];
+	}
+
+	async listApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+		return this.db
+			.select()
+			.from(schema.api_keys)
+			.where(eq(schema.api_keys.user_id, userId))
+			.orderBy(desc(schema.api_keys.created_at));
+	}
+
+	async deleteApiKey(id: string, userId: string): Promise<void> {
+		await this.db
+			.delete(schema.api_keys)
+			.where(and(eq(schema.api_keys.id, id), eq(schema.api_keys.user_id, userId)));
+	}
+
+	async deleteApiKeysByUserId(userId: string): Promise<void> {
+		await this.db.delete(schema.api_keys).where(eq(schema.api_keys.user_id, userId));
+	}
+
+	async touchApiKey(id: string, when: Date): Promise<void> {
+		await this.db
+			.update(schema.api_keys)
+			.set({ last_used_at: when })
+			.where(eq(schema.api_keys.id, id));
 	}
 
 	// ─── Paste Operations ──────────────────────────────────────────────────────

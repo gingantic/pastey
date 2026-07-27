@@ -18,6 +18,16 @@ export interface RefreshToken {
 	created_at: Date;
 }
 
+export interface ApiKey {
+	id: string;
+	user_id: string;
+	name: string;
+	key_hash: string; // SHA-256 hash of the raw key
+	prefix: string; // First chars of the raw key for display (e.g. pk_a1b2c3)
+	created_at: Date;
+	last_used_at: Date | null;
+}
+
 export interface Paste {
 	id: string;
 	title: string;
@@ -60,6 +70,14 @@ export interface DBAdapter {
 	getRefreshToken(hashedToken: string): Promise<RefreshToken | null>;
 	deleteRefreshToken(hashedToken: string): Promise<void>;
 	deleteRefreshTokensByUserId(userId: string): Promise<void>;
+	
+	// API Key operations
+	createApiKey(key: ApiKey): Promise<void>;
+	getApiKeyByHash(keyHash: string): Promise<ApiKey | null>;
+	listApiKeysByUserId(userId: string): Promise<ApiKey[]>;
+	deleteApiKey(id: string, userId: string): Promise<void>;
+	deleteApiKeysByUserId(userId: string): Promise<void>;
+	touchApiKey(id: string, when: Date): Promise<void>;
 	
 	// Paste operations
 	createPaste(paste: Paste): Promise<void>;

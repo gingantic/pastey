@@ -43,50 +43,6 @@ export function mapBackendPaste(p: any): Paste {
 	};
 }
 
-export async function savePaste(pasteData: {
-	title: string;
-	content: string;
-	lang: string;
-	expiry: string;
-	visibility: 'public' | 'unlisted' | 'private';
-	custom_slug?: string;
-}): Promise<Paste> {
-	const res = await auth.fetchWithAuth('/api/pastes', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(pasteData)
-	});
-
-	if (!res.ok) {
-		const err = await res.json().catch(() => ({}));
-		throw new Error(err.error || `Failed to save paste: HTTP ${res.status}`);
-	}
-
-	const data = await res.json();
-	return mapBackendPaste(data);
-}
-
-export async function getPasteById(id: string): Promise<Paste | undefined> {
-	try {
-		const res = await auth.fetchWithAuth(`/api/pastes/${id}`);
-		if (!res.ok) {
-			if (res.status === 404) {
-				return undefined;
-			}
-			const err = await res.json().catch(() => ({}));
-			throw new Error(err.error || `Failed to fetch paste: HTTP ${res.status}`);
-		}
-
-		const data = await res.json();
-		return mapBackendPaste(data);
-	} catch (e) {
-		console.error(e);
-		return undefined;
-	}
-}
-
 export async function deletePaste(id: string): Promise<void> {
 	const res = await auth.fetchWithAuth(`/api/pastes/${id}`, {
 		method: 'DELETE'
@@ -95,28 +51,4 @@ export async function deletePaste(id: string): Promise<void> {
 		const err = await res.json().catch(() => ({}));
 		throw new Error(err.error || `Failed to delete paste: HTTP ${res.status}`);
 	}
-}
-
-export async function updatePaste(id: string, pasteData: {
-	title: string;
-	content: string;
-	lang: string;
-	expiry: string;
-	visibility: 'public' | 'unlisted' | 'private';
-}): Promise<Paste> {
-	const res = await auth.fetchWithAuth(`/api/pastes/${id}`, {
-		method: 'PUT',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(pasteData)
-	});
-
-	if (!res.ok) {
-		const err = await res.json().catch(() => ({}));
-		throw new Error(err.error || `Failed to update paste: HTTP ${res.status}`);
-	}
-
-	const data = await res.json();
-	return mapBackendPaste(data);
 }

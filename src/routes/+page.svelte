@@ -3,10 +3,13 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { Check } from '@lucide/svelte';
-	import { savePaste, getPasteById, updatePaste } from '$lib/pasteStore';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/authStore.svelte';
+	import { deserialize } from '$app/forms';
+	import type { ActionResult } from '@sveltejs/kit';
 	import { page } from '$app/stores';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	// ─── State ───────────────────────────────────────────────────────────────
 	let showToast = $state(false);
@@ -23,31 +26,10 @@
 	}
 
 	let editId = $derived($page.url.searchParams.get('edit'));
-	let editPaste = $state<any>(null);
+	// Edit target is resolved server-side (owner-only) — no API round-trip needed
+	let editPaste = $derived(data.editPaste);
 
-	async function loadEditPaste() {
-		if (editId) {
-			try {
-				const p = await getPasteById(editId);
-				if (p && auth.currentUser && p.author.toLowerCase() === auth.currentUser.username.toLowerCase()) {
-					editPaste = p;
-				} else {
-					editPaste = null;
-				}
-			} catch (e) {
-				console.error(e);
-				editPaste = null;
-			}
-		} else {
-			editPaste = null;
-		}
-	}
-
-	$effect(() => {
-		loadEditPaste();
-	});
-
-	async function handleCreatePaste(data: {
+	async function handleCreatePaste(pasteData: {
 		title: string;
 		content: string;
 		lang: string;
@@ -57,18 +39,35 @@
 	}) {
 		isSubmitting = true;
 		try {
-			if (editId) {
-				await updatePaste(editId, data);
-				toast('Paste updated!');
+			// Submit through SvelteKit form actions — server-side logic, no REST API
+			const form = new FormData();
+			form.set('title', pasteData.title);
+			form.set('content', pasteData.content);
+			form.set('lang', pasteData.lang);
+			form.set('expiry', pasteData.expiry);
+			form.set('visibility', pasteData.visibility);
+			if (pasteData.custom_slug) form.set('custom_slug', pasteData.custom_slug);
+			if (editId) form.set('id', editId);
+
+			const response = await fetch(editId ? '?/update' : '?/create', {
+				method: 'POST',
+				body: form,
+				headers: { 'x-sveltekit-action': 'true' }
+			});
+			const result: ActionResult = deserialize(await response.text());
+
+			if (result.type === 'success' && result.data?.paste) {
+				toast(editId ? 'Paste updated!' : 'Paste created!');
+				const target = result.data.paste.id;
 				setTimeout(() => {
-					goto(`/${editId}`);
+					goto(`/${target}`);
 				}, 500);
+			} else if (result.type === 'failure') {
+				toast((result.data as any)?.error || 'Failed to save paste.');
+				isSubmitting = false;
 			} else {
-				const newPaste = await savePaste(data);
-				toast('Paste created!');
-				setTimeout(() => {
-					goto(`/${newPaste.id}`);
-				}, 500);
+				toast('Failed to save paste.');
+				isSubmitting = false;
 			}
 		} catch (err: any) {
 			toast(err.message || 'Failed to save paste.');

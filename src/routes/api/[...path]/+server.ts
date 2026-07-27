@@ -1,14 +1,44 @@
 import { dev } from '$app/environment';
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { verifyAccessToken } from '$lib/server/auth';
+import { verifyAccessToken, hashToken } from '$lib/server/auth';
+import { getDB } from '$lib/server/db';
 import * as authHandler from '$lib/server/handlers/auth';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import * as adminHandler from '$lib/server/handlers/admin';
+import * as keysHandler from '$lib/server/handlers/keys';
 import { JWT_ACCESS_EXPIRY_SECONDS, JWT_REFRESH_EXPIRY_SECONDS } from '$env/static/private';
 
 const accessExpiry = JWT_ACCESS_EXPIRY_SECONDS ? parseInt(JWT_ACCESS_EXPIRY_SECONDS, 10) : 15 * 60;
 const refreshExpiry = JWT_REFRESH_EXPIRY_SECONDS ? parseInt(JWT_REFRESH_EXPIRY_SECONDS, 10) : 30 * 24 * 60 * 60;
+
+async function getUserByApiKey(rawKey: string) {
+	if (!/^pk_[a-f0-9]{64}$/.test(rawKey)) {
+		return null;
+	}
+
+	const db = await getDB();
+	const key = await db.getApiKeyByHash(hashToken(rawKey));
+	if (!key) {
+		return null;
+	}
+
+	const user = await db.getUserById(key.user_id);
+	if (!user) {
+		return null;
+	}
+
+	// Track key usage without blocking the request
+	db.touchApiKey(key.id, new Date()).catch(() => {});
+
+	return {
+		user_id: user.id,
+		username: user.username,
+		email: user.email,
+		is_admin: user.is_admin,
+		via_api_key: true
+	};
+}
 
 async function getCurrentUser(event: any) {
 	if (event.locals.user) {
@@ -23,10 +53,19 @@ async function getCurrentUser(event: any) {
 	const authHeader = event.request.headers.get('authorization');
 	if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
 		const token = authHeader.substring(7);
+		if (token.startsWith('pk_')) {
+			return getUserByApiKey(token);
+		}
 		const claims = await verifyAccessToken(token);
 		if (claims) {
 			return claims;
 		}
+	}
+
+	// Fallback: API key via X-API-Key header
+	const apiKeyHeader = event.request.headers.get('x-api-key');
+	if (apiKeyHeader) {
+		return getUserByApiKey(apiKeyHeader);
 	}
 	
 	return null;
@@ -39,6 +78,13 @@ async function handleRouter(event: any) {
 	
 	const parts = path.split('/');
 	const user = await getCurrentUser(event);
+
+	// Global auth gate: every API endpoint requires authentication, except the
+	// auth routes that establish or tear down a session.
+	const openPaths = ['auth/signup', 'auth/login', 'auth/refresh', 'auth/logout'];
+	if (!user && !openPaths.includes(path)) {
+		return json({ error: 'authentication required' }, { status: 401 });
+	}
 
 	let body: any = null;
 	if (method !== 'GET' && method !== 'HEAD') {
@@ -98,9 +144,24 @@ async function handleRouter(event: any) {
 			}
 		}
 		
-		// 4. Admin Routes
+		// 4. API Key Management Routes (session/JWT only — API keys cannot manage themselves)
+		else if (parts[0] === 'keys') {
+			if ((user as any)?.via_api_key) {
+				res = { status: 403, error: 'forbidden: API keys cannot be used to manage API keys' };
+			} else if (parts.length === 1 && method === 'GET') {
+				res = await keysHandler.listKeys(user);
+			} else if (parts.length === 1 && method === 'POST') {
+				res = await keysHandler.createKey(body, user);
+			} else if (parts.length === 2 && method === 'DELETE') {
+				res = await keysHandler.deleteKey(parts[1], user);
+			}
+		}
+		
+		// 5. Admin Routes (API key auth is not accepted)
 		else if (parts[0] === 'admin') {
-			if (parts[1] === 'users') {
+			if ((user as any)?.via_api_key) {
+				res = { status: 403, error: 'forbidden: API keys cannot access admin endpoints' };
+			} else if (parts[1] === 'users') {
 				if (parts.length === 2 && method === 'GET') {
 					res = await adminHandler.listUsers(url, user);
 				} else if (parts.length === 3 && method === 'DELETE') {

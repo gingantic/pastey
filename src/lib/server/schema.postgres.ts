@@ -18,6 +18,16 @@ export const refresh_tokens = pgTable('refresh_tokens', {
 	created_at: timestamp('created_at', { withTimezone: true }).notNull()
 });
 
+export const api_keys = pgTable('api_keys', {
+	id: uuid('id').primaryKey().notNull(),
+	user_id: uuid('user_id').notNull(),
+	name: varchar('name', { length: 50 }).notNull(),
+	key_hash: varchar('key_hash', { length: 255 }).unique().notNull(),
+	prefix: varchar('prefix', { length: 20 }).notNull(),
+	created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+	last_used_at: timestamp('last_used_at', { withTimezone: true })
+});
+
 export const pastes = pgTable('pastes', {
 	id: varchar('id', { length: 50 }).primaryKey().notNull(),
 	title: varchar('title', { length: 255 }).default('Untitled').notNull(),
@@ -34,4 +44,5 @@ export const pastes = pgTable('pastes', {
 });
 export type PostgresUser = typeof users.$inferSelect;
 export type PostgresRefreshToken = typeof refresh_tokens.$inferSelect;
+export type PostgresApiKey = typeof api_keys.$inferSelect;
 export type PostgresPaste = typeof pastes.$inferSelect;

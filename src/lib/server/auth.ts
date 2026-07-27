@@ -55,6 +55,13 @@ export function generateRefreshToken() {
 	return { raw, hashed };
 }
 
+export function generateApiKey() {
+	const raw = `pk_${crypto.randomBytes(32).toString('hex')}`; // pk_ + 64 hex chars
+	const hashed = hashToken(raw);
+	const prefix = raw.slice(0, 10); // e.g. pk_a1b2c3d
+	return { raw, hashed, prefix };
+}
+
 export function hashToken(raw: string): string {
 	return crypto.createHash('sha256').update(raw).digest('hex');
 }

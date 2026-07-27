@@ -1,4 +1,4 @@
-import type { DBAdapter, User, RefreshToken, Paste, UserWithPasteCount } from './db';
+import type { DBAdapter, User, RefreshToken, ApiKey, Paste, UserWithPasteCount } from './db';
 
 export class RedisAdapterWrapper implements DBAdapter {
 	constructor(
@@ -68,6 +68,7 @@ export class RedisAdapterWrapper implements DBAdapter {
 		try {
 			await this.redis.del(`user:${id}`);
 			await this.deleteRefreshTokensByUserId(id);
+			await this.deleteApiKeysByUserId(id);
 		} catch (err) {
 			console.error('Redis deleteUser invalidate failed:', err);
 		}
@@ -144,6 +145,72 @@ export class RedisAdapterWrapper implements DBAdapter {
 		}
 
 		await this.underlying.deleteRefreshTokensByUserId(userId);
+	}
+
+	// ─── API Key Operations ───────────────────────────────────────────────────────
+
+	async createApiKey(key: ApiKey): Promise<void> {
+		await this.underlying.createApiKey(key);
+	}
+
+	async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+		try {
+			const cached = await this.redis.get(`ak:${keyHash}`);
+			if (cached) {
+				const key = JSON.parse(cached);
+				key.created_at = new Date(key.created_at);
+				key.last_used_at = key.last_used_at ? new Date(key.last_used_at) : null;
+				return key;
+			}
+		} catch (err) {
+			console.error('Redis getApiKeyByHash failed:', err);
+		}
+
+		const key = await this.underlying.getApiKeyByHash(keyHash);
+		if (key) {
+			try {
+				await this.redis.set(`ak:${keyHash}`, JSON.stringify(key), { EX: 300 });
+			} catch (err) {
+				console.error('Redis cache api key failed:', err);
+			}
+		}
+		return key;
+	}
+
+	async listApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+		return this.underlying.listApiKeysByUserId(userId);
+	}
+
+	async deleteApiKey(id: string, userId: string): Promise<void> {
+		// Invalidate the hash-lookup cache before removal
+		try {
+			const keys = await this.underlying.listApiKeysByUserId(userId);
+			const target = keys.find((k) => k.id === id);
+			if (target) {
+				await this.redis.del(`ak:${target.key_hash}`);
+			}
+		} catch (err) {
+			console.error('Redis deleteApiKey cache invalidate failed:', err);
+		}
+
+		await this.underlying.deleteApiKey(id, userId);
+	}
+
+	async deleteApiKeysByUserId(userId: string): Promise<void> {
+		try {
+			const keys = await this.underlying.listApiKeysByUserId(userId);
+			if (keys.length > 0) {
+				await this.redis.del(keys.map((k) => `ak:${k.key_hash}`));
+			}
+		} catch (err) {
+			console.error('Redis deleteApiKeysByUserId cache invalidate failed:', err);
+		}
+
+		await this.underlying.deleteApiKeysByUserId(userId);
+	}
+
+	async touchApiKey(id: string, when: Date): Promise<void> {
+		await this.underlying.touchApiKey(id, when);
 	}
 
 	// ─── Paste Operations ──────────────────────────────────────────────────────
