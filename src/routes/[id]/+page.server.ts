@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { mapBackendPaste } from '$lib/pasteStore';
 import { error } from '@sveltejs/kit';
 import * as pastesHandler from '$lib/server/handlers/pastes';
-import { applyPasteCacheTag, cacheableHeaders, pasteCacheTag } from '$lib/server/httpCache';
+import { cacheableHeaders } from '$lib/server/httpCache';
 
 export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 	const id = params.id;
@@ -30,15 +30,10 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 		//   - anonymous request (no logged-in user => no personalized layout)
 		//   - paste is public or unlisted (never private)
 		// Authenticated/private requests fall through and stay uncached.
-		// cacheableHeaders() emits a portable standard Cache-Control that works on
-		// any host, plus Vercel's long-cache + purge tag layered on top. On Vercel
-		// the tag is purged on edit/delete for instant updates; elsewhere the
-		// shorter standard s-maxage keeps content fresh. No lock-in either way.
+		// Portable short-window caching (standard Cache-Control) works on any
+		// host; an edit shows up within the s-maxage window. No vendor lock-in.
 		if (!currentUser && res.data && res.data.visibility !== 'private') {
-			setHeaders(cacheableHeaders(pasteCacheTag(id)));
-			// Reliably register the purge tag via the official Vercel API so
-			// invalidateByTag() can actually evict this page on edit/delete.
-			await applyPasteCacheTag(id);
+			setHeaders(cacheableHeaders());
 		}
 
 		return {

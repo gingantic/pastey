@@ -3,10 +3,8 @@ import { error } from '@sveltejs/kit';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import {
 	CACHE_CONTROL_PRIVATE,
-	applyPasteCacheTag,
 	cacheableHeaders,
 	etagMatches,
-	pasteCacheTag,
 	pasteETag
 } from '$lib/server/httpCache';
 
@@ -43,13 +41,9 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 		};
 
 		if (cacheable) {
-			// Standards-based caching for any host, plus Vercel long-cache + purge
-			// tag layered on top. Off Vercel the Vercel-* headers are inert and the
-			// portable s-maxage keeps working.
-			Object.assign(headers, cacheableHeaders(pasteCacheTag(id)));
-			// Reliably register the purge tag via the official Vercel API so
-			// invalidateByTag() can actually evict this entry on edit/delete.
-			await applyPasteCacheTag(id);
+			// Portable short-window edge caching. Repeat views are served from the
+			// CDN; after the window the ETag makes revalidation a cheap 304.
+			Object.assign(headers, cacheableHeaders());
 		} else {
 			headers['Cache-Control'] = CACHE_CONTROL_PRIVATE;
 		}

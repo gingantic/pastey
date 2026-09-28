@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { getDB } from '../db';
 import { checkRateLimit } from '../rateLimit';
-import { purgePaste } from '../httpCache';
 
 // Generates a case-sensitive random alphanumeric string of the specified length for use as a paste ID.
 function generatePasteId(length = 4): string {
@@ -156,8 +155,6 @@ export async function getPaste(id: string, currentUser: any): Promise<{ status: 
 	// Check expiry
 	if (paste.expires_at && new Date(paste.expires_at).getTime() < Date.now()) {
 		await db.deletePaste(id).catch(() => {});
-		// Drop any cached copy so the edge stops serving the expired paste.
-		await purgePaste(id).catch(() => {});
 		return { status: 404, error: 'paste has expired' };
 	}
 
@@ -211,10 +208,6 @@ export async function updatePaste(id: string, body: any, currentUser: any): Prom
 
 	await db.updatePaste(id, updates);
 
-	// Bust the CDN cache for this paste so the edit is visible immediately
-	// instead of waiting out the edge TTL. No-op off Vercel.
-	await purgePaste(id);
-
 	const updated = await db.getPasteById(id);
 	return { status: 200, data: updated };
 }
@@ -238,11 +231,6 @@ export async function deletePaste(id: string, currentUser: any): Promise<{ statu
 	}
 
 	await db.deletePaste(id);
-
-	// Bust the CDN cache so the now-deleted paste stops being served from the
-	// edge. No-op off Vercel.
-	await purgePaste(id);
-
 	return { status: 200, data: { message: 'paste deleted successfully' } };
 }
 
