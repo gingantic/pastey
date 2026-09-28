@@ -3,6 +3,7 @@ import { error } from '@sveltejs/kit';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import {
 	CACHE_CONTROL_PRIVATE,
+	applyPasteCacheTag,
 	cacheableHeaders,
 	etagMatches,
 	pasteCacheTag,
@@ -46,6 +47,9 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 			// tag layered on top. Off Vercel the Vercel-* headers are inert and the
 			// portable s-maxage keeps working.
 			Object.assign(headers, cacheableHeaders(pasteCacheTag(id)));
+			// Reliably register the purge tag via the official Vercel API so
+			// invalidateByTag() can actually evict this entry on edit/delete.
+			await applyPasteCacheTag(id);
 		} else {
 			headers['Cache-Control'] = CACHE_CONTROL_PRIVATE;
 		}

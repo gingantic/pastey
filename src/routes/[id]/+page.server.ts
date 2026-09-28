@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { mapBackendPaste } from '$lib/pasteStore';
 import { error } from '@sveltejs/kit';
 import * as pastesHandler from '$lib/server/handlers/pastes';
-import { cacheableHeaders, pasteCacheTag } from '$lib/server/httpCache';
+import { applyPasteCacheTag, cacheableHeaders, pasteCacheTag } from '$lib/server/httpCache';
 
 export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 	const id = params.id;
@@ -36,6 +36,9 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 		// shorter standard s-maxage keeps content fresh. No lock-in either way.
 		if (!currentUser && res.data && res.data.visibility !== 'private') {
 			setHeaders(cacheableHeaders(pasteCacheTag(id)));
+			// Reliably register the purge tag via the official Vercel API so
+			// invalidateByTag() can actually evict this page on edit/delete.
+			await applyPasteCacheTag(id);
 		}
 
 		return {

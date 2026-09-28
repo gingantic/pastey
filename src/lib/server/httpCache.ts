@@ -34,6 +34,11 @@ export const CACHE_CONTROL_VERCEL_CDN = `public, max-age=${VERCEL_EDGE_MAX_AGE_S
  *
  * Moving off Vercel needs no code change — the standard header keeps working and
  * the two `Vercel-*` headers simply become inert.
+ *
+ * NOTE: the `Vercel-Cache-Tag` header alone is not reliably indexed by the CDN
+ * when set through the SvelteKit adapter, so pair this with applyPasteCacheTag()
+ * which registers the tag via the official @vercel/functions API at request
+ * time. That is what makes invalidateByTag() actually purge the entry.
  */
 export function cacheableHeaders(cacheTag: string): Record<string, string> {
 	return {
@@ -41,6 +46,24 @@ export function cacheableHeaders(cacheTag: string): Record<string, string> {
 		'Vercel-CDN-Cache-Control': CACHE_CONTROL_VERCEL_CDN,
 		'Vercel-Cache-Tag': cacheTag
 	};
+}
+
+/**
+ * Register a paste's cache tag on the response the CDN is about to store, using
+ * the official Vercel API. This is the reliable counterpart to purgePaste():
+ * addCacheTag() here creates the tag->entry association that invalidateByTag()
+ * later purges. No-op off Vercel; errors are swallowed so a tagging hiccup never
+ * breaks the response.
+ */
+export async function applyPasteCacheTag(id: string): Promise<void> {
+	if (!process.env.VERCEL) return;
+
+	try {
+		const { addCacheTag } = await import('@vercel/functions');
+		await addCacheTag(pasteCacheTag(id));
+	} catch (err) {
+		console.error(`Failed to add cache tag for paste ${id}:`, err);
+	}
 }
 
 /** Header for responses that must never be stored by a shared cache. */
