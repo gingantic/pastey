@@ -2,8 +2,9 @@ import type { PageServerLoad } from './$types';
 import { mapBackendPaste } from '$lib/pasteStore';
 import { error } from '@sveltejs/kit';
 import * as pastesHandler from '$lib/server/handlers/pastes';
+import { cacheableHeaders, pasteCacheTag } from '$lib/server/httpCache';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 	const id = params.id;
 	
 	const currentUser = locals.user ? {
@@ -21,6 +22,20 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				return { paste: null, id };
 			}
 			throw error(res.status, res.error || 'Failed to fetch paste');
+		}
+
+		// Allow a shared CDN to cache the rendered page so repeat views are
+		// served from the edge instead of re-rendering on the origin (cuts
+		// Fast Origin Transfer). Only cache when it's safe:
+		//   - anonymous request (no logged-in user => no personalized layout)
+		//   - paste is public or unlisted (never private)
+		// Authenticated/private requests fall through and stay uncached.
+		// cacheableHeaders() emits a portable standard Cache-Control that works on
+		// any host, plus Vercel's long-cache + purge tag layered on top. On Vercel
+		// the tag is purged on edit/delete for instant updates; elsewhere the
+		// shorter standard s-maxage keeps content fresh. No lock-in either way.
+		if (!currentUser && res.data && res.data.visibility !== 'private') {
+			setHeaders(cacheableHeaders(pasteCacheTag(id)));
 		}
 
 		return {
