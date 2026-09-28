@@ -6,7 +6,7 @@ import crypto from 'crypto';
 // without needing any vendor-specific purge. Revalidation is cheap because the
 // ETag lets the origin answer unchanged requests with a bodyless 304, so origin
 // transfer stays low even after the window elapses.
-const SHARED_MAX_AGE_SECONDS = 60; // fresh at the edge for 1 minute
+const SHARED_MAX_AGE_SECONDS = 180; // fresh at the edge for 1 minute
 
 // While revalidating, keep serving the last good copy briefly so users never
 // block on the origin. Kept short so stale content can't linger long.
