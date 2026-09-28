@@ -265,6 +265,16 @@ export class PostgresAdapter implements DBAdapter {
 			.where(eq(schema.pastes.id, id));
 	}
 
+	async addPasteViews(id: string, delta: number): Promise<void> {
+		if (delta <= 0) {
+			return;
+		}
+		await this.db
+			.update(schema.pastes)
+			.set({ views: sql`${schema.pastes.views} + ${delta}` })
+			.where(eq(schema.pastes.id, id));
+	}
+
 	async listPublicPastes(limit: number, offset: number): Promise<{ pastes: Paste[]; total: number }> {
 		const now = new Date();
 		const condition = and(

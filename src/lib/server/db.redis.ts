@@ -1,4 +1,19 @@
+import { env } from '$env/dynamic/private';
 import type { DBAdapter, User, RefreshToken, ApiKey, Paste, UserWithPasteCount } from './db';
+
+// Default Redis cache TTL in seconds, overridable via REDIS_CACHE_TTL_SECONDS.
+const CACHE_TTL_SECONDS = (() => {
+	const parsed = parseInt(env.REDIS_CACHE_TTL_SECONDS ?? '', 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
+})();
+
+// How many buffered views accumulate in Redis before they are flushed to the
+// database in a single write. Higher values mean fewer DB writes under heavy
+// read traffic. Overridable via REDIS_VIEW_FLUSH_THRESHOLD.
+const VIEW_FLUSH_THRESHOLD = (() => {
+	const parsed = parseInt(env.REDIS_VIEW_FLUSH_THRESHOLD ?? '', 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+})();
 
 export class RedisAdapterWrapper implements DBAdapter {
 	constructor(
@@ -32,7 +47,7 @@ export class RedisAdapterWrapper implements DBAdapter {
 		const user = await this.underlying.getUserById(id);
 		if (user) {
 			try {
-				await this.redis.set(`user:${id}`, JSON.stringify(user), { EX: 3600 });
+				await this.redis.set(`user:${id}`, JSON.stringify(user), { EX: CACHE_TTL_SECONDS });
 			} catch (err) {
 				console.error('Redis cache user failed:', err);
 			}
@@ -222,7 +237,7 @@ export class RedisAdapterWrapper implements DBAdapter {
 				const userPastesKey = `user_pastes:${paste.author_id}`;
 				const ttl = paste.expires_at
 					? Math.max(1, Math.ceil((paste.expires_at.getTime() - Date.now()) / 1000))
-					: 3600;
+					: CACHE_TTL_SECONDS;
 				await this.redis.sAdd(userPastesKey, paste.id);
 				await this.redis.expire(userPastesKey, ttl);
 			} catch (err) {
@@ -266,7 +281,7 @@ export class RedisAdapterWrapper implements DBAdapter {
 		const paste = await this.underlying.getPasteById(id);
 		if (paste) {
 			try {
-				const defaultTTL = 3600;
+				const defaultTTL = CACHE_TTL_SECONDS;
 				let ttl = defaultTTL;
 				if (paste.expires_at) {
 					const remaining = Math.floor((paste.expires_at.getTime() - Date.now()) / 1000);
@@ -306,6 +321,7 @@ export class RedisAdapterWrapper implements DBAdapter {
 		try {
 			await this.redis.del(`paste:${id}`);
 			await this.redis.del(`paste_views:${id}`);
+			await this.redis.del(`paste_views_pending:${id}`);
 			if (paste && paste.author_id) {
 				await this.redis.sRem(`user_pastes:${paste.author_id}`, id);
 			}
@@ -319,7 +335,11 @@ export class RedisAdapterWrapper implements DBAdapter {
 			const userPastesKey = `user_pastes:${authorId}`;
 			const pasteIds = await this.redis.sMembers(userPastesKey);
 			if (pasteIds.length > 0) {
-				const keys = pasteIds.flatMap((id: string) => [`paste:${id}`, `paste_views:${id}`]);
+				const keys = pasteIds.flatMap((id: string) => [
+					`paste:${id}`,
+					`paste_views:${id}`,
+					`paste_views_pending:${id}`
+				]);
 				await this.redis.del(keys);
 			}
 			await this.redis.del(userPastesKey);
@@ -331,16 +351,49 @@ export class RedisAdapterWrapper implements DBAdapter {
 	}
 
 	async incrementPasteViews(id: string): Promise<void> {
-		await this.underlying.incrementPasteViews(id);
+		// Write-behind: buffer views in Redis and flush to the DB in batches so a
+		// popular paste doesn't generate one DB write per view. Only when Redis is
+		// unavailable do we fall back to writing every view straight to the DB.
 		try {
-			// Increment counter if it exists in Redis, otherwise ignore (it will load on next getPasteById)
+			// Keep the live display counter in sync if it's currently cached, so
+			// reads reflect views immediately without a DB round-trip.
 			const exists = await this.redis.exists(`paste_views:${id}`);
 			if (exists) {
 				await this.redis.incr(`paste_views:${id}`);
 			}
+
+			// Track how many views still need to be persisted to the DB.
+			const pendingKey = `paste_views_pending:${id}`;
+			const pending = await this.redis.incr(pendingKey);
+			// Guard against the pending counter lingering forever if a paste stops
+			// being viewed before it reaches the flush threshold.
+			await this.redis.expire(pendingKey, CACHE_TTL_SECONDS);
+
+			if (pending >= VIEW_FLUSH_THRESHOLD) {
+				// Atomically claim the buffered count and reset it, then flush.
+				const claimed = await this.redis.getDel(pendingKey);
+				const delta = parseInt(claimed ?? '0', 10);
+				if (delta > 0) {
+					try {
+						await this.underlying.addPasteViews(id, delta);
+					} catch (err) {
+						console.error('Redis view flush to DB failed, re-buffering:', err);
+						// Don't lose the views: add them back to the pending counter.
+						await this.redis.incrBy(pendingKey, delta).catch(() => {});
+						await this.redis.expire(pendingKey, CACHE_TTL_SECONDS).catch(() => {});
+					}
+				}
+			}
 		} catch (err) {
-			console.error('Redis incrementPasteViews failed:', err);
+			console.error('Redis incrementPasteViews failed, writing directly to DB:', err);
+			await this.underlying.incrementPasteViews(id).catch((e) => {
+				console.error('Direct incrementPasteViews fallback failed:', e);
+			});
 		}
+	}
+
+	async addPasteViews(id: string, delta: number): Promise<void> {
+		await this.underlying.addPasteViews(id, delta);
 	}
 
 	async listPublicPastes(limit: number, offset: number): Promise<{ pastes: Paste[]; total: number }> {

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getDB } from '../db';
+import { checkRateLimit } from '../rateLimit';
 
 // Generates a case-sensitive random alphanumeric string of the specified length for use as a paste ID.
 function generatePasteId(length = 4): string {
@@ -70,11 +71,24 @@ function getExpiresAt(expiry: string): Date | null {
 	return new Date(Date.now() + ms);
 }
 
-export async function createPaste(body: any, currentUser: any) {
+export async function createPaste(body: any, currentUser: any, ip?: string) {
 	const { title, content, lang, expiry, visibility, custom_slug } = body || {};
 
 	if (!content || content.trim() === '') {
 		return { status: 400, error: 'content cannot be empty' };
+	}
+
+	// Gate before touching the database: limit paste creation per IP within an
+	// hour so a single client can't hammer the DB. Runs before getDB()/queries.
+	if (ip) {
+		const rate = await checkRateLimit(ip);
+		if (!rate.allowed) {
+			return {
+				status: 429,
+				error: `too many pastes from your IP, please try again in ${rate.retryAfter} seconds`,
+				retryAfter: rate.retryAfter
+			};
+		}
 	}
 
 	const db = await getDB();

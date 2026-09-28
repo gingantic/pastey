@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { mapBackendPaste } from '$lib/pasteStore';
 import * as pastesHandler from '$lib/server/handlers/pastes';
+import { getClientIp } from '$lib/server/ip';
 
 // Build handler claims from the session — pages talk to the codebase logic
 // directly so the REST API can stay fully auth-gated.
@@ -50,9 +51,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 };
 
 export const actions: Actions = {
-	create: async ({ request, locals }) => {
+	create: async (event) => {
+		const { request, locals } = event;
 		const form = await request.formData();
-		const res = await pastesHandler.createPaste(pasteDataFromForm(form), toClaims(locals));
+		const res = await pastesHandler.createPaste(
+			pasteDataFromForm(form),
+			toClaims(locals),
+			getClientIp(event)
+		);
 
 		if (res.status >= 400 || !res.data) {
 			return fail(res.status, { error: res.error || 'Failed to save paste' });

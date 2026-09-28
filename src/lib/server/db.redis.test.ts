@@ -63,6 +63,21 @@ class MockRedis {
 		this.store.set(key, newVal.toString());
 		return newVal;
 	}
+
+	async incrBy(key: string, amount: number) {
+		const val = this.store.get(key);
+		const num = val ? parseInt(val, 10) : 0;
+		const newVal = num + amount;
+		this.store.set(key, newVal.toString());
+		return newVal;
+	}
+
+	async getDel(key: string) {
+		const val = this.store.get(key) ?? null;
+		this.store.delete(key);
+		this.expirations.delete(key);
+		return val;
+	}
 }
 
 describe('RedisAdapterWrapper', () => {
@@ -92,6 +107,7 @@ describe('RedisAdapterWrapper', () => {
 			deletePaste: vi.fn(),
 			deletePastesByAuthorId: vi.fn(),
 			incrementPasteViews: vi.fn(),
+			addPasteViews: vi.fn(),
 			listPublicPastes: vi.fn(),
 			listPastesByAuthorId: vi.fn(),
 			listPastesByAuthorName: vi.fn(),
@@ -264,13 +280,35 @@ describe('RedisAdapterWrapper', () => {
 			expect(mockDB.getPasteById).not.toHaveBeenCalled();
 		});
 
-		it('should increment view count in DB and in Redis cache if active', async () => {
+		it('should buffer views in Redis without writing to DB on each view', async () => {
 			await mockRedis.set('paste_views:p123', '10');
 
 			await wrapper.incrementPasteViews('p123');
 
-			expect(mockDB.incrementPasteViews).toHaveBeenCalledWith('p123');
+			// Live display counter bumps immediately for cached reads.
 			expect(await mockRedis.get('paste_views:p123')).toBe('11');
+			// Pending buffer tracks the un-persisted view.
+			expect(await mockRedis.get('paste_views_pending:p123')).toBe('1');
+			// The DB is NOT written on a single view (write-behind).
+			expect(mockDB.addPasteViews).not.toHaveBeenCalled();
+			expect(mockDB.incrementPasteViews).not.toHaveBeenCalled();
+		});
+
+		it('should flush buffered views to the DB once the threshold is reached', async () => {
+			await mockRedis.set('paste_views:p123', '0');
+
+			// Default flush threshold is 10.
+			for (let i = 0; i < 10; i++) {
+				await wrapper.incrementPasteViews('p123');
+			}
+
+			// One batched DB write of all 10 buffered views.
+			expect(mockDB.addPasteViews).toHaveBeenCalledTimes(1);
+			expect(mockDB.addPasteViews).toHaveBeenCalledWith('p123', 10);
+			// Pending buffer reset after the flush.
+			expect(await mockRedis.get('paste_views_pending:p123')).toBeNull();
+			// Live counter still reflects every view.
+			expect(await mockRedis.get('paste_views:p123')).toBe('10');
 		});
 
 		it('should invalidate paste cache on update and delete', async () => {

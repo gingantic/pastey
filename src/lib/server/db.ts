@@ -86,6 +86,7 @@ export interface DBAdapter {
 	deletePaste(id: string): Promise<void>;
 	deletePastesByAuthorId(authorId: string): Promise<void>;
 	incrementPasteViews(id: string): Promise<void>;
+	addPasteViews(id: string, delta: number): Promise<void>;
 	listPublicPastes(limit: number, offset: number): Promise<{ pastes: Paste[]; total: number }>;
 	listPastesByAuthorId(authorId: string): Promise<{ pastes: Paste[]; total: number }>;
 	listPastesByAuthorName(authorName: string, showAll: boolean): Promise<{ pastes: Paste[]; total: number }>;

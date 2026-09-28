@@ -7,6 +7,7 @@ import * as authHandler from '$lib/server/handlers/auth';
 import * as pastesHandler from '$lib/server/handlers/pastes';
 import * as adminHandler from '$lib/server/handlers/admin';
 import * as keysHandler from '$lib/server/handlers/keys';
+import { getClientIp } from '$lib/server/ip';
 import { JWT_ACCESS_EXPIRY_SECONDS, JWT_REFRESH_EXPIRY_SECONDS } from '$env/static/private';
 
 const accessExpiry = JWT_ACCESS_EXPIRY_SECONDS ? parseInt(JWT_ACCESS_EXPIRY_SECONDS, 10) : 15 * 60;
@@ -128,7 +129,7 @@ async function handleRouter(event: any) {
 		else if (parts[0] === 'pastes') {
 			if (parts.length === 1) {
 				if (method === 'POST') {
-					res = await pastesHandler.createPaste(body, user);
+					res = await pastesHandler.createPaste(body, user, getClientIp(event));
 				}
 			} else if (parts.length === 2) {
 				const id = parts[1];
